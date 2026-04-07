@@ -251,36 +251,36 @@ export function getPearlsForCase(subspecialty: string, title: string): TeachingP
   return pearls;
 }
 
-// ABO Question type descriptions for educational context
+// ABO 8-Element PMP Framework — maps question numbers to structured answer sequence
 export const QUESTION_TYPE_INFO: { [key: number]: { name: string; description: string; tips: string } } = {
   1: {
     name: 'Differential Diagnosis',
     description: 'List the most likely diagnoses from most to least probable.',
-    tips: 'Lead with the most likely diagnosis. Include 3-5 differentials. Consider common and must-not-miss diagnoses.',
+    tips: 'Lead with the most likely first, then life/sight-threatening rule-outs (GCA, retinoblastoma, open globe). Include 3-5 differentials ranked by frequency. Avoid over-differentiating with rare "zebras."',
   },
   2: {
     name: 'Patient History',
     description: 'What targeted questions would you ask to narrow your differential?',
-    tips: 'Focus on symptoms, timing, associated conditions, medications, family history, and social history relevant to the differential.',
+    tips: 'Ask FOCUSED questions, not an exhaustive ROS. Target onset, duration, pain, PMH (DM, HTN, autoimmune), medications (steroids, hydroxychloroquine), family and social history. Hypothesis-driven, not shotgunning.',
   },
   3: {
     name: 'Clinical Examination',
     description: 'What specific exam findings are you looking for?',
-    tips: 'Be systematic. Start with observation, then targeted examination. Mention specific signs pathognomonic for your top diagnosis.',
+    tips: 'Always start with VA, pupils (RAPD), IOP, confrontation fields. Name specific signs: Shafer sign, Seidel test, forced duction. The examiner scores your PROCESS, not just the finding.',
   },
   4: {
     name: 'Diagnostic Testing',
     description: 'What tests would confirm or rule out your leading diagnosis?',
-    tips: 'Start with non-invasive tests. Include specific test names (not just "blood work"). Know what results you expect.',
+    tips: 'Order ONLY pertinent tests — shotgunning loses points. Name specific tests: OCT, FFA, B-scan, CT/MRI. State what you expect each to show. Avoid invasive tests unless clearly indicated.',
   },
   5: {
     name: 'Treatment & Management',
     description: 'How would you treat this condition?',
-    tips: 'Be specific: drug names, doses, frequencies, duration. Start conservative, escalate as needed. Include follow-up plan.',
+    tips: 'Least to most invasive UNLESS emergency. Be specific: drug names, doses, frequencies, duration. Reference landmark trials (EVS, ONTT, DRCR.net). Anticipate curveballs: allergies, complications, treatment failure.',
   },
   6: {
     name: 'Prognosis & Counseling',
     description: 'What do you tell the patient about their condition?',
-    tips: 'Cover: natural history, expected outcomes, timeline, warning signs, lifestyle modifications, follow-up schedule.',
+    tips: 'Cover: natural history, expected outcomes, warning signs for return, lifestyle changes, follow-up intervals. Discuss informed consent for procedures. Patient counseling IS scored — never skip it.',
   },
 };

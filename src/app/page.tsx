@@ -471,18 +471,37 @@ export default function Home() {
           <div className="glass-card rounded-xl p-6 mb-10">
             <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">About the ABO Oral Examination</h3>
             <div className="divider-glow mb-4" />
-            <div className="grid sm:grid-cols-3 gap-6 text-sm">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 text-sm mb-5">
               <div>
                 <p className="text-primary-400 font-medium text-xs uppercase tracking-wider mb-1.5">Format</p>
-                <p className="text-slate-400 text-xs leading-relaxed">Two 60-minute sessions with 2 examiners each. Clinical scenarios covering all subspecialties.</p>
+                <p className="text-slate-400 text-xs leading-relaxed">42 Patient Management Problems across 3 virtual rooms (50 min each). 2 examiners per room, 7 cases each. ~3.5 minutes per case.</p>
               </div>
               <div>
                 <p className="text-primary-400 font-medium text-xs uppercase tracking-wider mb-1.5">Scoring</p>
-                <p className="text-slate-400 text-xs leading-relaxed">Competency-based across diagnosis, workup, management, and patient communication.</p>
+                <p className="text-slate-400 text-xs leading-relaxed">3 domains scored 0-3: Data Acquisition, Diagnosis, Management. Compensatory model — strength offsets weakness. Pass/fail only.</p>
               </div>
               <div>
-                <p className="text-primary-400 font-medium text-xs uppercase tracking-wider mb-1.5">Preparation</p>
-                <p className="text-slate-400 text-xs leading-relaxed">Practice systematically across all subspecialties. Focus on structured approaches and clinical reasoning.</p>
+                <p className="text-primary-400 font-medium text-xs uppercase tracking-wider mb-1.5">Pass Rates</p>
+                <p className="text-slate-400 text-xs leading-relaxed">~79-87% for first-time takers. ~63% for repeat takers. Knowledge alone is insufficient — verbal fluency and structure are critical.</p>
+              </div>
+              <div>
+                <p className="text-primary-400 font-medium text-xs uppercase tracking-wider mb-1.5">Room Pairings</p>
+                <p className="text-slate-400 text-xs leading-relaxed">Room 1: Anterior + Optics. Room 2: External + Pediatrics. Room 3: Neuro-Ophthalmology + Posterior Segment.</p>
+              </div>
+            </div>
+            <div className="divider-glow mb-4" />
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div className="bg-slate-800/30 rounded-lg p-3">
+                <p className="text-[10px] text-primary-400 uppercase tracking-wider font-medium mb-1">8-Element PMP Framework</p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">Image Description, History, Exam, DDx, Workup, Diagnosis, Management, Patient Education</p>
+              </div>
+              <div className="bg-slate-800/30 rounded-lg p-3">
+                <p className="text-[10px] text-amber-400 uppercase tracking-wider font-medium mb-1">Fatal Flaws</p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">Missing GCA in AION, retinoblastoma in leukocoria, open globe signs, or starting oral steroids alone in optic neuritis</p>
+              </div>
+              <div className="bg-slate-800/30 rounded-lg p-3">
+                <p className="text-[10px] text-emerald-400 uppercase tracking-wider font-medium mb-1">Key Trials</p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">ONTT, CATT, DRCR.net, EVS, COMS, AREDS2, PEDIG, IIHTT, OHTS</p>
               </div>
             </div>
           </div>
