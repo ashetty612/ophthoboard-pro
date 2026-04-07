@@ -39,13 +39,15 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
     if (textareaRef.current) textareaRef.current.focus();
   }, [currentCaseIdx, currentQuestionIdx]);
 
+  const [timeUp, setTimeUp] = useState(false);
+
   useEffect(() => {
-    if (phase === "active" && totalTimeRemaining > 0) {
+    if (phase === "active") {
       timerRef.current = setInterval(() => {
         setTotalTimeRemaining((prev) => {
           if (prev <= 1) {
             clearInterval(timerRef.current!);
-            finishExam();
+            setTimeUp(true);
             return 0;
           }
           return prev - 1;
@@ -120,6 +122,10 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
     setExamResults(results);
     setPhase("results");
   }, [examCases, answers, photoAnswers, timePerCase]);
+
+  useEffect(() => {
+    if (timeUp) finishExam();
+  }, [timeUp, finishExam]);
 
   const handleNextQuestion = () => {
     const currentCase = examCases[currentCaseIdx];

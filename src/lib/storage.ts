@@ -39,7 +39,7 @@ export function getProgress(): StudyProgress {
 function getDefaultProgress(): StudyProgress {
   return {
     totalCasesAttempted: 0,
-    totalCasesAvailable: 158,
+    totalCasesAvailable: 350,
     averageScore: 0,
     bestScore: 0,
     worstScore: 0,
@@ -91,7 +91,7 @@ function updateProgress(attempts: CaseAttempt[]): void {
 
   const progress: StudyProgress = {
     totalCasesAttempted: uniqueCases.size,
-    totalCasesAvailable: 158,
+    totalCasesAvailable: 350,
     averageScore: scores.length > 0
       ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
       : 0,
@@ -119,11 +119,11 @@ function getSubspecialtyName(prefix: string): string {
 
 function getSubspecialtyTotal(name: string): number {
   const map: { [key: string]: number } = {
-    'Anterior Segment': 43,
-    'Posterior Segment': 37,
-    'Neuro-Ophthalmology and Orbit': 25,
-    'Pediatric Ophthalmology': 20,
-    'Optics': 33,
+    'Anterior Segment': 109,
+    'Posterior Segment': 65,
+    'Neuro-Ophthalmology and Orbit': 61,
+    'Pediatric Ophthalmology': 45,
+    'Optics': 70,
   };
   return map[name] || 0;
 }
