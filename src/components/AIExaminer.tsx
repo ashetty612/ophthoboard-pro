@@ -16,8 +16,16 @@ interface Message {
 
 type ExaminerMode = "free-chat" | "examiner" | "tutor" | "quiz";
 
-const OPENROUTER_KEY = "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";
 const MODEL = "qwen/qwen3-235b-a22b:free";
+const API_KEY_STORAGE = "ophtho_openrouter_key";
+
+function getStoredApiKey(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(API_KEY_STORAGE) || "";
+}
+function setStoredApiKey(key: string) {
+  if (typeof window !== "undefined") localStorage.setItem(API_KEY_STORAGE, key);
+}
 
 function buildSystemPrompt(mode: ExaminerMode, database: CasesDatabase, currentCase?: CaseData | null): string {
   const caseContext = currentCase
@@ -57,13 +65,18 @@ IMPORTANT GUIDELINES:
   }
 }
 
-async function streamChat(messages: Message[], onChunk: (text: string) => void, onDone: () => void): Promise<void> {
+async function streamChat(messages: Message[], apiKey: string, onChunk: (text: string) => void, onDone: () => void): Promise<void> {
+  if (!apiKey) {
+    onChunk("Please set your OpenRouter API key first. Click 'New Session' to configure it.");
+    onDone();
+    return;
+  }
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENROUTER_KEY}`,
+        "Authorization": `Bearer ${apiKey}`,
         "HTTP-Referer": typeof window !== 'undefined' ? window.location.origin : "https://ophthoboard.vercel.app",
         "X-Title": "OphthoBoard Pro AI Examiner",
       },
@@ -123,8 +136,16 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentCase, setCurrentCase] = useState<CaseData | null>(initialCase || null);
+  const [apiKey, setApiKey] = useState("");
+  const [showKeyInput, setShowKeyInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const stored = getStoredApiKey();
+    if (stored) setApiKey(stored);
+    else setShowKeyInput(true);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -166,7 +187,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
       const allMsgs = [systemMsg, assistantMsg, { role: "user" as const, content: "Start the quiz!" }];
       setIsStreaming(true);
       let accumulated = "";
-      streamChat(allMsgs, (chunk) => {
+      streamChat(allMsgs, apiKey, (chunk) => {
         accumulated += chunk;
         setMessages([systemMsg, assistantMsg, { role: "assistant", content: accumulated }]);
       }, () => {
@@ -189,7 +210,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     const placeholderMsg: Message = { role: "assistant", content: "" };
     setMessages([...updatedMessages, placeholderMsg]);
 
-    await streamChat(updatedMessages, (chunk) => {
+    await streamChat(updatedMessages, apiKey, (chunk) => {
       accumulated += chunk;
       setMessages([...updatedMessages, { role: "assistant", content: accumulated }]);
     }, () => {
@@ -269,11 +290,53 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               </select>
             </div>
 
+            {/* API Key Setup */}
+            <div className="mb-6">
+              <button
+                onClick={() => setShowKeyInput(!showKeyInput)}
+                className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+                {apiKey ? "API Key configured" : "Set up API Key (required)"}
+                {apiKey && <span className="text-emerald-400 text-xs">Connected</span>}
+              </button>
+              {showKeyInput && (
+                <div className="mt-3 animate-fade-in">
+                  <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                    <p className="text-xs text-slate-400 mb-2">
+                      Enter your <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-primary-400 underline">OpenRouter API key</a> (free tier available).
+                      Get one at openrouter.ai - sign up is free and gives access to free AI models.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder="sk-or-v1-..."
+                        className="flex-1 px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600/50 text-white text-sm placeholder-slate-500"
+                      />
+                      <button
+                        onClick={() => { setStoredApiKey(apiKey); setShowKeyInput(false); }}
+                        disabled={!apiKey.startsWith("sk-")}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium transition-colors"
+                      >
+                        Save
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">Your key is stored locally in your browser only. Never sent anywhere except OpenRouter.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
-              onClick={startSession}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold text-lg transition-all shadow-lg"
+              onClick={() => { setStoredApiKey(apiKey); startSession(); }}
+              disabled={!apiKey.startsWith("sk-")}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-700 disabled:cursor-not-allowed text-white font-semibold text-lg transition-all shadow-lg"
             >
-              Start Session
+              {apiKey.startsWith("sk-") ? "Start Session" : "Enter API Key to Start"}
             </button>
           </div>
         </div>
