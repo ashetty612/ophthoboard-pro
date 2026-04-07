@@ -15,7 +15,7 @@ export default function SubspecialtyBrowser({
   onSelectCase,
   onBack,
 }: SubspecialtyBrowserProps) {
-  const [filter, setFilter] = useState<"all" | "unattempted" | "bookmarked" | "with-images" | "osler">("all");
+  const [filter, setFilter] = useState<"all" | "unattempted" | "bookmarked" | "with-images">("all");
   const [sortBy, setSortBy] = useState<"number" | "score" | "attempts">("number");
   const [caseScores, setCaseScores] = useState<{ [key: string]: { best: number; attempts: number } }>({});
 
@@ -34,7 +34,6 @@ export default function SubspecialtyBrowser({
   }, [subspecialty]);
 
   const activeCases = subspecialty.cases.filter((c) => c.questions.length > 0);
-  const placeholderCases = subspecialty.cases.filter((c) => c.questions.length === 0);
 
   let filteredCases = activeCases;
   if (filter === "unattempted") {
@@ -43,8 +42,6 @@ export default function SubspecialtyBrowser({
     filteredCases = activeCases.filter((c) => isBookmarked(c.id));
   } else if (filter === "with-images") {
     filteredCases = activeCases.filter((c) => c.imageFile);
-  } else if (filter === "osler") {
-    filteredCases = activeCases.filter((c) => c.source === "Osler");
   }
 
   if (sortBy === "score") {
@@ -106,7 +103,6 @@ export default function SubspecialtyBrowser({
               ["unattempted", "Not Attempted"],
               ["bookmarked", "Bookmarked"],
               ["with-images", "With Images"],
-              ["osler", "Osler"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -168,7 +164,7 @@ export default function SubspecialtyBrowser({
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <span className="text-xs text-slate-500">
-                      Case {c.caseNumber} &bull; {c.source}
+                      Case {c.caseNumber}
                     </span>
                     <h3 className="text-sm font-semibold text-white group-hover:text-primary-300 transition-colors truncate">
                       {c.title}
@@ -200,30 +196,6 @@ export default function SubspecialtyBrowser({
           })}
         </div>
 
-        {/* Placeholder Osler Cases */}
-        {placeholderCases.length > 0 && (
-          <div className="mt-10">
-            <h3 className="text-lg font-bold text-white mb-4">
-              Osler Study Manual Reference Cases
-            </h3>
-            <p className="text-sm text-slate-400 mb-4">
-              These cases are listed in the Table of Contents for reference. Content is available in the Osler Study Manual.
-            </p>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {placeholderCases.map((c) => (
-                <div
-                  key={c.id}
-                  className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 opacity-60"
-                >
-                  <span className="text-xs text-slate-500">
-                    Case {c.caseNumber} &bull; {c.source}
-                  </span>
-                  <h3 className="text-sm font-medium text-slate-300">{c.title}</h3>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

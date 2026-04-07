@@ -11,6 +11,7 @@ export interface CaseData {
   caseNumber: number;
   source: string;
   title: string;
+  diagnosisTitle?: string;
   subspecialty: string;
   presentation: string;
   imageFile: string | null;

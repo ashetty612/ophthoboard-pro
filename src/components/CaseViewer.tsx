@@ -177,7 +177,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 {caseData.subspecialty}
               </span>
               <span className="px-3 py-1 rounded-full bg-slate-700 text-slate-300 text-xs">
-                Case {caseData.caseNumber} &bull; {caseData.source}
+                Case {caseData.caseNumber}
               </span>
               {previousAttempts.length > 0 && (
                 <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs">
@@ -556,7 +556,10 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
         <div className="max-w-4xl mx-auto px-4 py-8">
           {/* Score Hero */}
           <div className="glass-card rounded-2xl p-8 text-center mb-8 animate-fade-in-up">
-            <h2 className="text-2xl font-bold text-white mb-6">Case Complete</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">Case Complete</h2>
+            {caseData.diagnosisTitle && (
+              <p className="text-lg text-primary-400 font-medium mb-4">Diagnosis: {caseData.diagnosisTitle}</p>
+            )}
 
             {/* Score Ring */}
             <div className="relative w-40 h-40 mx-auto mb-6">

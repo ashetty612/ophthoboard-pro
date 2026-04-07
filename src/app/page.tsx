@@ -9,8 +9,9 @@ import SubspecialtyBrowser from "@/components/SubspecialtyBrowser";
 import ReviewMode from "@/components/ReviewMode";
 import ExamMode from "@/components/ExamMode";
 import FlashcardMode from "@/components/FlashcardMode";
+import AIExaminer from "@/components/AIExaminer";
 
-type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards";
+type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner";
 
 export default function Home() {
   const [database, setDatabase] = useState<CasesDatabase | null>(null);
@@ -171,6 +172,18 @@ export default function Home() {
     );
   }
 
+  if (currentView === "ai-examiner") {
+    return (
+      <AIExaminer
+        database={database}
+        onBack={() => {
+          setCurrentView("home");
+          scrollToTop();
+        }}
+      />
+    );
+  }
+
   // Home View
   const progress = getProgress();
   const bookmarks = getBookmarks();
@@ -223,6 +236,12 @@ export default function Home() {
               className="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 transition-colors"
             >
               Exam Sim
+            </button>
+            <button
+              onClick={() => setCurrentView("ai-examiner")}
+              className="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-cyan-300 hover:text-cyan-200 hover:bg-cyan-500/10 transition-colors"
+            >
+              AI Tutor
             </button>
             <button
               onClick={() => setCurrentView("dashboard")}
@@ -441,7 +460,7 @@ export default function Home() {
 
         {/* Quick Actions */}
         {!searchQuery && (
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-12">
             <button
               onClick={() => {
                 const allCases = database.subspecialties.flatMap((s) =>
@@ -514,6 +533,23 @@ export default function Home() {
               </div>
               <p className="text-sm text-slate-400">
                 Quick-fire concept review cards
+              </p>
+            </button>
+
+            <button
+              onClick={() => setCurrentView("ai-examiner")}
+              className="glass-card rounded-xl p-5 text-left hover-lift group border border-cyan-500/20"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 text-lg">
+                  🤖
+                </div>
+                <h3 className="font-semibold text-white group-hover:text-cyan-300 transition-colors">
+                  AI Examiner
+                </h3>
+              </div>
+              <p className="text-sm text-slate-400">
+                AI tutor, mock examiner & quiz
               </p>
             </button>
 
