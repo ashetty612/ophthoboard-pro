@@ -391,30 +391,38 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="max-w-3xl mx-auto space-y-3">
           {messages.filter(m => m.role !== "system").map((msg, i) => (
             <div
               key={i}
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
             >
+              {msg.role === "assistant" && (
+                <div className="w-7 h-7 rounded-lg bg-primary-500/15 flex items-center justify-center text-xs text-primary-400 shrink-0 mr-2 mt-0.5">
+                  AI
+                </div>
+              )}
               <div
-                className={`max-w-[85%] rounded-2xl px-5 py-3 ${
+                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                   msg.role === "user"
-                    ? "bg-primary-600 text-white"
-                    : "glass-card-light text-slate-200"
+                    ? "bg-slate-700/80 text-white border border-slate-600/30"
+                    : "bg-slate-900/50 text-slate-200 border border-slate-800/50"
                 }`}
               >
-                <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">{msg.content}</div>
               </div>
             </div>
           ))}
           {isStreaming && messages[messages.length - 1]?.content === "" && (
             <div className="flex justify-start">
-              <div className="glass-card-light rounded-2xl px-5 py-3">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="w-7 h-7 rounded-lg bg-primary-500/15 flex items-center justify-center text-xs text-primary-400 shrink-0 mr-2 mt-0.5">
+                AI
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3">
+                <div className="flex gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             </div>

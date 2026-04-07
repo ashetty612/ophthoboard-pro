@@ -230,39 +230,39 @@ export default function FlashcardMode({ database, onBack, onPractice }: Flashcar
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* Card */}
-        <div
-          onClick={handleFlip}
-          className="glass-card rounded-2xl p-8 min-h-[300px] flex flex-col justify-center cursor-pointer hover-lift transition-all animate-fade-in"
-        >
-          {side === "front" ? (
-            <div className="text-center">
-              <span className="text-xs text-primary-400 font-medium uppercase tracking-wider">{card.caseData.subspecialty}</span>
-              <h2 className="text-xl font-bold text-white mt-2 mb-4">{card.caseData.title}</h2>
-              <p className="text-slate-400 mb-4">{card.caseData.presentation}</p>
-              {card.caseData.imageFile && (
-                <div className="rounded-xl overflow-hidden bg-black/50 max-w-sm mx-auto mb-4">
-                  <img src={`/images/${card.caseData.imageFile}`} alt="" className="w-full h-auto" />
+        {/* 3D Flip Card */}
+        <div className="perspective-1000 min-h-[320px]" onClick={handleFlip}>
+          <div className={`relative w-full min-h-[320px] preserve-3d flip-transition cursor-pointer ${side === "back" ? "rotate-y-180" : ""}`}>
+            {/* Front */}
+            <div className="absolute inset-0 backface-hidden glass-card rounded-2xl p-8 flex flex-col justify-center">
+              <div className="text-center">
+                <span className="text-[10px] text-primary-400/80 font-medium uppercase tracking-[0.2em]">{card.caseData.subspecialty}</span>
+                <h2 className="text-xl font-bold text-white mt-2 mb-3">{card.caseData.title}</h2>
+                <p className="text-sm text-slate-400 mb-4">{card.caseData.presentation}</p>
+                {card.caseData.imageFile && (
+                  <div className="rounded-xl overflow-hidden bg-black/50 max-w-sm mx-auto mb-4">
+                    <img src={`/images/${card.caseData.imageFile}`} alt="" className="w-full h-auto" />
+                  </div>
+                )}
+                <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-4 mt-3">
+                  <p className="text-sm font-medium text-primary-300">{question.question}</p>
                 </div>
-              )}
-              <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-4 mt-4">
-                <p className="text-sm font-medium text-primary-300">{question.question}</p>
+                <p className="text-[10px] text-slate-600 mt-4 uppercase tracking-wider">Tap to reveal</p>
               </div>
-              <p className="text-xs text-slate-500 mt-4">Tap to reveal answer</p>
             </div>
-          ) : (
-            <div className="animate-fade-in">
-              <span className="text-xs text-emerald-400 font-medium uppercase tracking-wider">Answer</span>
-              <div className="text-sm text-slate-200 whitespace-pre-line mt-3 mb-4">{question.answer}</div>
+            {/* Back */}
+            <div className="absolute inset-0 backface-hidden rotate-y-180 glass-card rounded-2xl p-8 flex flex-col justify-center overflow-y-auto">
+              <span className="text-[10px] text-emerald-400 font-medium uppercase tracking-[0.2em]">Answer</span>
+              <div className="text-sm text-slate-200 whitespace-pre-line mt-3 mb-4 leading-relaxed">{question.answer}</div>
               {question.keyPoints.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-3">
+                <div className="flex flex-wrap gap-1 mt-2">
                   {question.keyPoints.slice(0, 8).map((kp, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">{kp}</span>
+                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{kp}</span>
                   ))}
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Rating buttons */}

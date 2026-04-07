@@ -185,8 +185,47 @@ export const SUBSPECIALTY_PEARLS: { [key: string]: TeachingPearl[] } = {
       pearl: 'Spherical aberration: Peripheral rays refracted more than paraxial rays. Managed with aspheric lens designs. Relevant for IOL selection.',
       examTip: 'Understand the clinical relevance of optical aberrations.',
     },
+    {
+      category: 'Prisms',
+      pearl: 'Prentice rule: Prism (diopters) = decentration (cm) x lens power (D). Used to calculate induced prism from lens decentration. Critical for understanding unwanted prismatic effects.',
+      examTip: 'Know when this matters clinically: bifocal segment placement, progressive lens fitting.',
+    },
+    {
+      category: 'Refraction',
+      pearl: 'Jackson cross-cylinder (JCC): Used to refine cylinder power and axis. Flip shows two choices - patient picks the clearer one. For axis: straddle the current axis. For power: align with the current axis.',
+      examTip: 'Understand the step-by-step procedure and when to switch from axis to power refinement.',
+    },
   ],
 };
+
+// Additional high-yield exam strategy pearls
+export const ADVANCED_STRATEGY_PEARLS: TeachingPearl[] = [
+  {
+    category: 'Exam Technique',
+    pearl: 'When the examiner says "anything else?" they are almost always hinting that you missed something important. Pause, reconsider your differential, and think about what you may have overlooked.',
+    examTip: 'This is a gift from the examiner - use it.',
+  },
+  {
+    category: 'Exam Technique',
+    pearl: 'Never say "I dont know" outright. Instead, reason through it: "I would approach this systematically by considering..." Even partial credit matters.',
+    examTip: 'Examiners give credit for clinical reasoning even without the exact answer.',
+  },
+  {
+    category: 'Surgical',
+    pearl: 'For any surgical complication question, always address: immediate management, short-term follow-up, long-term prognosis, and informed consent considerations.',
+    examTip: 'Showing you can manage complications demonstrates surgical maturity.',
+  },
+  {
+    category: 'Systemic Disease',
+    pearl: 'For diabetes, hypertension, and autoimmune conditions affecting the eye, always mention: co-management with the appropriate specialist, systemic optimization, and the specific screening schedule.',
+    examTip: 'Multidisciplinary care shows you practice comprehensive ophthalmology.',
+  },
+  {
+    category: 'Ethics/Communication',
+    pearl: 'If asked about a complication or error, always include: honest disclosure to the patient, documentation, informed consent for next steps, and when to involve risk management.',
+    examTip: 'Patient communication and ethics are scored - dont skip them.',
+  },
+];
 
 export function getPearlsForCase(subspecialty: string, title: string): TeachingPearl[] {
   const pearls: TeachingPearl[] = [];
@@ -196,18 +235,18 @@ export function getPearlsForCase(subspecialty: string, title: string): TeachingP
   pearls.push(...specPearls.filter(p => {
     const titleLower = title.toLowerCase();
     const pearlLower = p.pearl.toLowerCase();
-    // Check for keyword overlap between case title and pearl
     const titleWords = titleLower.split(/\s+/).filter(w => w.length > 3);
     return titleWords.some(w => pearlLower.includes(w));
   }));
 
   // If no specific match, include first 2 general pearls for the subspecialty
   if (pearls.length === 0 && specPearls.length > 0) {
-    pearls.push(specPearls[0]);
+    pearls.push(specPearls[0], specPearls[Math.min(1, specPearls.length - 1)]);
   }
 
-  // Always include one general strategy pearl
-  pearls.push(EXAM_STRATEGY_PEARLS[Math.floor(Math.random() * EXAM_STRATEGY_PEARLS.length)]);
+  // Include one general strategy pearl
+  const allStrategy = [...EXAM_STRATEGY_PEARLS, ...ADVANCED_STRATEGY_PEARLS];
+  pearls.push(allStrategy[Math.floor(Math.random() * allStrategy.length)]);
 
   return pearls;
 }
