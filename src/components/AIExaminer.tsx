@@ -18,10 +18,11 @@ type ExaminerMode = "free-chat" | "examiner" | "tutor" | "quiz";
 
 const MODEL = "qwen/qwen3-235b-a22b:free";
 const API_KEY_STORAGE = "ophtho_openrouter_key";
+const BUILTIN_KEY = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || "";
 
 function getStoredApiKey(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(API_KEY_STORAGE) || "";
+  if (typeof window === "undefined") return BUILTIN_KEY;
+  return localStorage.getItem(API_KEY_STORAGE) || BUILTIN_KEY;
 }
 function setStoredApiKey(key: string) {
   if (typeof window !== "undefined") localStorage.setItem(API_KEY_STORAGE, key);
@@ -142,8 +143,8 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const stored = getStoredApiKey();
-    if (stored) setApiKey(stored);
+    const key = getStoredApiKey();
+    if (key) setApiKey(key);
     else setShowKeyInput(true);
   }, []);
 
@@ -290,49 +291,50 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               </select>
             </div>
 
-            {/* API Key Setup */}
-            <div className="mb-6">
-              <button
-                onClick={() => setShowKeyInput(!showKeyInput)}
-                className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                {apiKey ? "API Key configured" : "Set up API Key (required)"}
-                {apiKey && <span className="text-emerald-400 text-xs">Connected</span>}
-              </button>
-              {showKeyInput && (
-                <div className="mt-3 animate-fade-in">
-                  <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
-                    <p className="text-xs text-slate-400 mb-2">
-                      Enter your <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-primary-400 underline">OpenRouter API key</a> (free tier available).
-                      Get one at openrouter.ai - sign up is free and gives access to free AI models.
-                    </p>
-                    <div className="flex gap-2">
-                      <input
-                        type="password"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="sk-or-v1-..."
-                        className="flex-1 px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600/50 text-white text-sm placeholder-slate-500"
-                      />
-                      <button
-                        onClick={() => { setStoredApiKey(apiKey); setShowKeyInput(false); }}
-                        disabled={!apiKey.startsWith("sk-")}
-                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium transition-colors"
-                      >
-                        Save
-                      </button>
+            {/* API Key Setup — only shown if no builtin key is configured */}
+            {!BUILTIN_KEY && (
+              <div className="mb-6">
+                <button
+                  onClick={() => setShowKeyInput(!showKeyInput)}
+                  className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  {apiKey ? "API Key configured" : "Set up API Key (required)"}
+                  {apiKey && <span className="text-emerald-400 text-xs">Connected</span>}
+                </button>
+                {showKeyInput && (
+                  <div className="mt-3 animate-fade-in">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                      <p className="text-xs text-slate-400 mb-2">
+                        Enter your <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-primary-400 underline">OpenRouter API key</a> (free tier available).
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder="sk-or-v1-..."
+                          className="flex-1 px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600/50 text-white text-sm placeholder-slate-500"
+                        />
+                        <button
+                          onClick={() => { setStoredApiKey(apiKey); setShowKeyInput(false); }}
+                          disabled={!apiKey.startsWith("sk-")}
+                          className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium transition-colors"
+                        >
+                          Save
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">Your key is stored locally in your browser only.</p>
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">Your key is stored locally in your browser only. Never sent anywhere except OpenRouter.</p>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             <button
-              onClick={() => { setStoredApiKey(apiKey); startSession(); }}
+              onClick={() => { if (!BUILTIN_KEY) setStoredApiKey(apiKey); startSession(); }}
               disabled={!apiKey.startsWith("sk-")}
               className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-700 disabled:cursor-not-allowed text-white font-semibold text-lg transition-all shadow-lg"
             >
