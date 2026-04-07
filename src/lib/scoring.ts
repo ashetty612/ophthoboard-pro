@@ -206,14 +206,17 @@ const CONCEPT_CLUSTERS: { [key: string]: string[] } = {
   'corneal_protection': ['artificial tears', 'lubricant', 'bandage contact lens', 'bcl', 'tarsorrhaphy', 'amniotic membrane', 'moisture chamber'],
 };
 
-// Question weight distribution (ABO-style emphasis)
+// Question weight distribution aligned to ABO 3-Domain Rubric
+// Domain 1 (Data Acquisition): Q2 History + Q3 Exam + Q4 Tests = 33%
+// Domain 2 (Diagnosis): Q1 Differential = 33%
+// Domain 3 (Management): Q5 Treatment + Q6 Counseling = 34%
 const QUESTION_WEIGHTS: { [key: number]: number } = {
-  1: 20, // Differential diagnosis - critical
-  2: 10, // History questions
-  3: 15, // Exam findings
-  4: 15, // Diagnostic tests
-  5: 25, // Treatment - most important
-  6: 15, // Prognosis/counseling
+  1: 25, // Differential diagnosis — Diagnosis domain (must be prioritized, include must-not-miss)
+  2: 10, // History — Data Acquisition domain (focused, hypothesis-driven)
+  3: 12, // Exam findings — Data Acquisition domain (specific signs, not generic)
+  4: 13, // Diagnostic tests — Data Acquisition domain (pertinent only, no shotgunning)
+  5: 25, // Treatment — Management domain (specific drugs/doses, stepwise approach)
+  6: 15, // Prognosis/Counseling — Management domain (follow-up, patient education IS scored)
 };
 
 function normalizeText(text: string): string {
@@ -345,15 +348,15 @@ export function scoreAnswer(question: Question, userAnswer: string): UserAnswer 
     : 100;
 
   if (percentage >= 90) {
-    feedback = 'Excellent! Comprehensive answer covering the key concepts.';
+    feedback = 'Above Expected (3/3) — Comprehensive response covering key concepts with specificity.';
   } else if (percentage >= 70) {
-    feedback = 'Good answer. You hit most of the important points.';
+    feedback = 'Expected (2/3) — Solid answer hitting most important points.';
   } else if (percentage >= 50) {
-    feedback = 'Adequate but incomplete. Several important points were missed.';
+    feedback = 'Below Expected (1/3) — Incomplete response. Key elements were missed.';
   } else if (percentage >= 25) {
-    feedback = 'Below expectations. Review the core concepts for this topic.';
+    feedback = 'Unacceptable (0/3) — Major gaps in knowledge. Focused review needed.';
   } else {
-    feedback = 'Significant gaps. Focused study on this topic is recommended.';
+    feedback = 'Unacceptable (0/3) — Significant deficiency. Review core concepts thoroughly.';
   }
 
   if (missedKeywords.length > 0 && missedKeywords.length <= 5) {
@@ -406,34 +409,34 @@ export function scorePhotoDescription(
 }
 
 export function calculateGrade(percentageScore: number): string {
-  if (percentageScore >= 90) return 'Outstanding';
+  if (percentageScore >= 90) return 'Above Expected';
   if (percentageScore >= 80) return 'Excellent';
-  if (percentageScore >= 70) return 'Satisfactory';
+  if (percentageScore >= 70) return 'Expected';
   if (percentageScore >= 60) return 'Borderline';
-  if (percentageScore >= 50) return 'Below Expectations';
-  return 'Unsatisfactory';
+  if (percentageScore >= 50) return 'Below Expected';
+  return 'Unacceptable';
 }
 
 export function getGradeColor(grade: string): string {
   switch (grade) {
-    case 'Outstanding': return 'text-emerald-400';
+    case 'Above Expected': return 'text-emerald-400';
     case 'Excellent': return 'text-emerald-500';
-    case 'Satisfactory': return 'text-primary-400';
+    case 'Expected': return 'text-primary-400';
     case 'Borderline': return 'text-amber-400';
-    case 'Below Expectations': return 'text-amber-500';
-    case 'Unsatisfactory': return 'text-rose-400';
+    case 'Below Expected': return 'text-amber-500';
+    case 'Unacceptable': return 'text-rose-400';
     default: return 'text-slate-400';
   }
 }
 
 export function getGradeBgColor(grade: string): string {
   switch (grade) {
-    case 'Outstanding': return 'bg-emerald-500/20 border-emerald-500/30';
+    case 'Above Expected': return 'bg-emerald-500/20 border-emerald-500/30';
     case 'Excellent': return 'bg-emerald-500/15 border-emerald-500/25';
-    case 'Satisfactory': return 'bg-primary-500/20 border-primary-500/30';
+    case 'Expected': return 'bg-primary-500/20 border-primary-500/30';
     case 'Borderline': return 'bg-amber-500/20 border-amber-500/30';
-    case 'Below Expectations': return 'bg-amber-500/15 border-amber-500/25';
-    case 'Unsatisfactory': return 'bg-rose-500/20 border-rose-500/30';
+    case 'Below Expected': return 'bg-amber-500/15 border-amber-500/25';
+    case 'Unacceptable': return 'bg-rose-500/20 border-rose-500/30';
     default: return 'bg-slate-500/20 border-slate-500/30';
   }
 }

@@ -191,7 +191,7 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
                 ⏱️
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Mock Oral Board Exam</h2>
-              <p className="text-slate-400">Configure your timed practice session</p>
+              <p className="text-slate-400 text-sm">42 PMPs, 3 rooms, 50 min each. ~3.5 min/case target.</p>
             </div>
 
             {/* Number of cases */}
@@ -449,9 +449,31 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
           </div>
           <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${getGradeBgColor(overallGrade)}`}>
             <span className={`text-sm font-medium ${getGradeColor(overallGrade)}`}>
-              {overallPct >= 70 ? "PASS - Well done!" : "Needs more preparation"}
+              {overallPct >= 70 ? "PASS" : "Needs more preparation"}
             </span>
           </div>
+        </div>
+
+        {/* ABO 3-Domain Breakdown */}
+        <div className="grid grid-cols-3 gap-3 mb-8">
+          {[
+            { label: "Data Acquisition", desc: "History, Exam, Tests", color: "text-primary-400", questions: [2, 3, 4] },
+            { label: "Diagnosis", desc: "DDx & Working Dx", color: "text-violet-400", questions: [1] },
+            { label: "Management", desc: "Treatment & Counseling", color: "text-emerald-400", questions: [5, 6] },
+          ].map((domain) => {
+            const domainScore = examResults.reduce((sum, r) =>
+              sum + r.answers.filter(a => domain.questions.includes(a.questionNumber)).reduce((s, a) => s + a.score, 0), 0);
+            const domainMax = examResults.reduce((sum, r) =>
+              sum + r.answers.filter(a => domain.questions.includes(a.questionNumber)).reduce((s, a) => s + a.maxScore, 0), 0);
+            const domainPct = domainMax > 0 ? Math.round((domainScore / domainMax) * 100) : 0;
+            return (
+              <div key={domain.label} className="glass-card rounded-xl p-4 text-center">
+                <p className={`text-lg font-bold stat-number ${domain.color}`}>{domainPct}%</p>
+                <p className="text-xs font-medium text-white mt-1">{domain.label}</p>
+                <p className="text-[10px] text-slate-500">{domain.desc}</p>
+              </div>
+            );
+          })}
         </div>
 
         {/* Per-case results */}

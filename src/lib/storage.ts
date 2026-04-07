@@ -3,6 +3,7 @@ import { CaseAttempt, StudyProgress } from './types';
 const STORAGE_KEY = 'ophtho_boards_progress';
 const ATTEMPTS_KEY = 'ophtho_boards_attempts';
 const BOOKMARKS_KEY = 'ophtho_boards_bookmarks';
+const STREAK_KEY = 'ophtho_boards_streak';
 
 export function saveAttempt(attempt: CaseAttempt): void {
   if (typeof window === 'undefined') return;
@@ -155,9 +156,33 @@ export function isBookmarked(caseId: string): boolean {
   return getBookmarks().includes(caseId);
 }
 
+export function getStudyStreak(): { current: number; lastDate: string } {
+  if (typeof window === 'undefined') return { current: 0, lastDate: '' };
+  try {
+    const data = localStorage.getItem(STREAK_KEY);
+    return data ? JSON.parse(data) : { current: 0, lastDate: '' };
+  } catch {
+    return { current: 0, lastDate: '' };
+  }
+}
+
+export function updateStudyStreak(): number {
+  if (typeof window === 'undefined') return 0;
+  const today = new Date().toISOString().split('T')[0];
+  const streak = getStudyStreak();
+
+  if (streak.lastDate === today) return streak.current;
+
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const newStreak = streak.lastDate === yesterday ? streak.current + 1 : 1;
+  localStorage.setItem(STREAK_KEY, JSON.stringify({ current: newStreak, lastDate: today }));
+  return newStreak;
+}
+
 export function clearAllData(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(ATTEMPTS_KEY);
   localStorage.removeItem(BOOKMARKS_KEY);
+  localStorage.removeItem(STREAK_KEY);
 }

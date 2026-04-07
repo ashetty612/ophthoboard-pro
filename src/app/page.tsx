@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { CasesDatabase, CaseData, Subspecialty } from "@/lib/types";
-import { getProgress, getBookmarks } from "@/lib/storage";
+import { getProgress, getBookmarks, getStudyStreak } from "@/lib/storage";
 import CaseViewer from "@/components/CaseViewer";
 import Dashboard from "@/components/Dashboard";
 import SubspecialtyBrowser from "@/components/SubspecialtyBrowser";
@@ -194,6 +194,7 @@ export default function Home() {
   // Home View
   const progress = getProgress();
   const bookmarks = getBookmarks();
+  const streak = getStudyStreak();
   const totalActiveCases = database.subspecialties.reduce(
     (sum, s) => sum + s.cases.filter((c) => c.questions.length > 0).length,
     0
@@ -264,7 +265,7 @@ export default function Home() {
             { label: "Completed", value: progress.totalCasesAttempted, suffix: `/${totalActiveCases}`, color: "text-primary-400" },
             { label: "Average", value: `${progress.averageScore}`, suffix: "%", color: progress.averageScore >= 70 ? "text-emerald-400" : "text-amber-400" },
             { label: "Best Score", value: `${progress.bestScore}`, suffix: "%", color: "text-emerald-400" },
-            { label: "Bookmarks", value: bookmarks.length, suffix: "", color: "text-amber-400" },
+            { label: "Streak", value: streak.current, suffix: streak.current === 1 ? " day" : " days", color: "text-violet-400" },
           ].map((stat) => (
             <div key={stat.label} className="glass-card rounded-xl p-4 text-center">
               <p className={`stat-number text-2xl font-bold ${stat.color}`}>

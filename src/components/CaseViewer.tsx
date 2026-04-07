@@ -9,7 +9,7 @@ import {
   getGradeColor,
   getGradeBgColor,
 } from "@/lib/scoring";
-import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase } from "@/lib/storage";
+import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateStudyStreak } from "@/lib/storage";
 import { getPearlsForCase, QUESTION_TYPE_INFO } from "@/lib/pearls";
 
 interface CaseViewerProps {
@@ -104,6 +104,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
       };
 
       saveAttempt(attempt);
+      updateStudyStreak();
       setPhase("results");
     }
   };
@@ -601,14 +602,34 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
               </div>
             </div>
 
+            {/* ABO Domain Breakdown */}
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {[
+                { label: "Data Acquisition", questions: [2, 3, 4], color: "text-primary-400" },
+                { label: "Diagnosis", questions: [1], color: "text-violet-400" },
+                { label: "Management", questions: [5, 6], color: "text-emerald-400" },
+              ].map((domain) => {
+                const dAnswers = scoredAnswers.filter(a => domain.questions.includes(a.questionNumber));
+                const dScore = dAnswers.reduce((s, a) => s + a.score, 0);
+                const dMax = dAnswers.reduce((s, a) => s + a.maxScore, 0);
+                const dPct = dMax > 0 ? Math.round((dScore / dMax) * 100) : 0;
+                return (
+                  <div key={domain.label} className="bg-slate-800/50 rounded-xl p-3 text-center">
+                    <p className={`text-lg font-bold stat-number ${domain.color}`}>{dPct}%</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{domain.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
             {/* Grade Badge */}
             <div
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${getGradeBgColor(grade)}`}
             >
               <span className={`text-sm font-medium ${getGradeColor(grade)}`}>
                 {percentageScore >= 70
-                  ? "You would PASS this section"
-                  : "Needs more review to pass"}
+                  ? "PASS"
+                  : "Needs more review"}
               </span>
             </div>
           </div>
