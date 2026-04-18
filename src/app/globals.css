@@ -69,7 +69,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg-gradient-start);
   min-height: 100vh;
   color: #cbd5e1;
@@ -102,13 +102,13 @@ body::after {
 
 /* Headings use Space Grotesk */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;
   letter-spacing: -0.02em;
 }
 
 /* Monospace for scores/numbers */
 .font-mono {
-  font-family: 'JetBrains Mono', 'Menlo', monospace;
+  font-family: var(--font-jetbrains-mono), 'Menlo', monospace;
 }
 
 /* Custom scrollbar */
@@ -283,12 +283,12 @@ button:focus-visible {
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-size: 0.875em;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-jetbrains-mono), monospace;
 }
 
 /* Stat number styling */
 .stat-number {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-space-grotesk), sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
 }
