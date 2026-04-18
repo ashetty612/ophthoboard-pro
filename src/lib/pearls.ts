@@ -457,7 +457,7 @@ export const SUBSPECIALTY_PEARLS: { [key: string]: TeachingPearl[] } = {
     },
     {
       category: 'Contact Lens',
-      pearl: 'Contact lens fitting: base curve should be slightly flatter than central K reading. Fluorescein pattern: ideal = central alignment with edge clearance. Too flat = central pooling. Too steep = central touch.',
+      pearl: 'Contact lens fitting: base curve should be slightly flatter than central K reading. Fluorescein pattern: ideal = central alignment with edge clearance. Too flat = central touch with edge pooling. Too steep = central pooling with edge touch/lift-off.',
       examTip: 'Know the fluorescein patterns and what each indicates.',
     },
     {
@@ -605,6 +605,6 @@ export const QUESTION_TYPE_INFO: { [key: number]: { name: string; description: s
   6: {
     name: 'Follow-Up',
     description: 'Explicit follow-up interval and what you would check. This is the step most candidates forget — it is HEAVILY weighted.',
-    tips: 'State a SPECIFIC interval: "1 week" not "soon." State what you would check at follow-up. Include: return precautions (new floaters, vision loss, increasing pain), activity restrictions, driving restrictions if applicable. Follow-up accounts for ~10% of total score and is the most commonly omitted element.',
+    tips: 'State a SPECIFIC interval: "1 week" not "soon." State what you would check at follow-up. Include: return precautions (new floaters, vision loss, increasing pain), activity restrictions, driving restrictions if applicable. Follow-up accounts for ~20% of the question score and is the most commonly omitted element.',
   },
 };

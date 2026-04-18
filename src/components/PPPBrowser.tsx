@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface PPPRecommendation {
   text: string;
@@ -155,7 +155,7 @@ export default function PPPBrowser({ onBack }: PPPBrowserProps) {
     const currentQuestion = quizState.questions[quizState.currentQ];
 
     if (isComplete) {
-      const pct = Math.round((quizState.score / quizState.total) * 100);
+      const pct = quizState.total > 0 ? Math.round((quizState.score / quizState.total) * 100) : 0;
       return (
         <div className="min-h-screen">
           <div className="glass-card sticky top-0 z-50 border-b border-slate-700/50">
@@ -188,8 +188,16 @@ export default function PPPBrowser({ onBack }: PPPBrowserProps) {
       );
     }
 
-    // Shuffle answers for current question
-    const allAnswers = [currentQuestion.answer, ...currentQuestion.distractors].sort(() => Math.random() - 0.5);
+    // Shuffle answers once per question (memoized to prevent re-render reshuffling)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const allAnswers = useMemo(() => {
+      const answers = [currentQuestion.answer, ...currentQuestion.distractors];
+      for (let i = answers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [answers[i], answers[j]] = [answers[j], answers[i]];
+      }
+      return answers;
+    }, [quizState.currentQ]);
 
     return (
       <div className="min-h-screen">

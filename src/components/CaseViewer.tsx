@@ -34,7 +34,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   } | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
-  const [startTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(Date.now());
   const [showImage, setShowImage] = useState(true);
   const [showTeaching, setShowTeaching] = useState(false);
   const [showPitfalls, setShowPitfalls] = useState(false);
@@ -96,7 +96,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
       const maxPossible =
         scored.reduce((sum, a) => sum + a.maxScore, 0) +
         (photoScore?.maxScore || 0);
-      const percentageScore = Math.round((totalScore / maxPossible) * 100);
+      const percentageScore = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 100) : 0;
 
       const attempt: CaseAttempt = {
         caseId: caseData.id,
@@ -692,7 +692,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   if (phase === "results") {
     const totalScore = scoredAnswers.reduce((sum, a) => sum + a.score, 0) + (photoScore?.score || 0);
     const maxPossible = scoredAnswers.reduce((sum, a) => sum + a.maxScore, 0) + (photoScore?.maxScore || 0);
-    const percentageScore = Math.round((totalScore / maxPossible) * 100);
+    const percentageScore = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 100) : 0;
     const grade = calculateGrade(percentageScore);
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
 
@@ -842,6 +842,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 setShowTeaching(false);
                 setShowPitfalls(false);
                 setImageLoadError(false);
+                setStartTime(Date.now());
               }}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
             >

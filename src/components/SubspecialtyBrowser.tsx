@@ -41,7 +41,7 @@ export default function SubspecialtyBrowser({
   } else if (filter === "bookmarked") {
     filteredCases = activeCases.filter((c) => isBookmarked(c.id));
   } else if (filter === "with-images") {
-    filteredCases = activeCases.filter((c) => c.imageFile);
+    filteredCases = activeCases.filter((c) => c.imageFile || c.externalImageUrl);
   }
 
   if (sortBy === "score") {

@@ -336,10 +336,15 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
         </div>
 
         <div className="max-w-4xl mx-auto px-4 py-6">
-          {/* Image */}
-          {currentCase.imageFile && (
+          {/* Image — supports both local and external URLs */}
+          {(currentCase.imageFile || currentCase.externalImageUrl) && (
             <div className="mb-4 rounded-xl overflow-hidden bg-black/50 max-w-md">
-              <img src={`/images/${currentCase.imageFile}`} alt="" className="w-full h-auto" />
+              <img
+                src={currentCase.imageFile ? `/images/${currentCase.imageFile}` : (currentCase.externalImageUrl || '')}
+                alt="Clinical photograph"
+                className="w-full h-auto"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
             </div>
           )}
 

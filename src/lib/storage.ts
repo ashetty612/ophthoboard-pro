@@ -4,20 +4,54 @@ const STORAGE_KEY = 'ophtho_boards_progress';
 const ATTEMPTS_KEY = 'ophtho_boards_attempts';
 const BOOKMARKS_KEY = 'ophtho_boards_bookmarks';
 const STREAK_KEY = 'ophtho_boards_streak';
+const MAX_ATTEMPTS = 500; // Prune oldest attempts when exceeding this limit
+
+// Safe localStorage write — handles QuotaExceededError gracefully
+function safeSetItem(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    // QuotaExceededError or other write failure — try pruning old data
+    try {
+      const attempts = getAttempts();
+      if (attempts.length > 50) {
+        // Remove oldest half of attempts to free space
+        const pruned = attempts.slice(Math.floor(attempts.length / 2));
+        localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(pruned));
+        // Retry the original write
+        localStorage.setItem(key, value);
+        return true;
+      }
+    } catch {
+      // Storage is truly full — fail silently rather than crash
+    }
+    return false;
+  }
+}
 
 export function saveAttempt(attempt: CaseAttempt): void {
   if (typeof window === 'undefined') return;
   const attempts = getAttempts();
   attempts.push(attempt);
-  localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
-  updateProgress(attempts);
+
+  // Prune if exceeding max to prevent unbounded growth
+  const pruned = attempts.length > MAX_ATTEMPTS
+    ? attempts.slice(attempts.length - MAX_ATTEMPTS)
+    : attempts;
+
+  safeSetItem(ATTEMPTS_KEY, JSON.stringify(pruned));
+  updateProgress(pruned);
 }
 
 export function getAttempts(): CaseAttempt[] {
   if (typeof window === 'undefined') return [];
   try {
     const data = localStorage.getItem(ATTEMPTS_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    // Validate it's an array
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -31,7 +65,13 @@ export function getProgress(): StudyProgress {
   if (typeof window === 'undefined') return getDefaultProgress();
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : getDefaultProgress();
+    if (!data) return getDefaultProgress();
+    const parsed = JSON.parse(data);
+    // Basic schema validation
+    if (typeof parsed === 'object' && parsed !== null && 'totalCasesAttempted' in parsed) {
+      return parsed as StudyProgress;
+    }
+    return getDefaultProgress();
   } catch {
     return getDefaultProgress();
   }
@@ -53,7 +93,7 @@ function getDefaultProgress(): StudyProgress {
 
 function updateProgress(attempts: CaseAttempt[]): void {
   const uniqueCases = new Set(attempts.map(a => a.caseId));
-  const scores = attempts.map(a => a.percentageScore);
+  const scores = attempts.map(a => a.percentageScore).filter(s => typeof s === 'number' && !isNaN(s));
 
   const bySubspecialty: StudyProgress['bySubspecialty'] = {};
 
@@ -76,13 +116,13 @@ function updateProgress(attempts: CaseAttempt[]): void {
 
     const specScores = attempts
       .filter(a => a.caseId.startsWith(subspecialty))
-      .map(a => a.percentageScore);
+      .map(a => a.percentageScore)
+      .filter(s => typeof s === 'number' && !isNaN(s));
     bySubspecialty[specName].averageScore =
-      Math.round(specScores.reduce((a, b) => a + b, 0) / specScores.length);
+      specScores.length > 0 ? Math.round(specScores.reduce((a, b) => a + b, 0) / specScores.length) : 0;
     bySubspecialty[specName].lastAttempt = attempt.timestamp;
   }
 
-  // Determine weak and strong areas
   const weakAreas: string[] = [];
   const strongAreas: string[] = [];
   for (const [name, data] of Object.entries(bySubspecialty)) {
@@ -104,7 +144,7 @@ function updateProgress(attempts: CaseAttempt[]): void {
     strongAreas,
   };
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  safeSetItem(STORAGE_KEY, JSON.stringify(progress));
 }
 
 function getSubspecialtyName(prefix: string): string {
@@ -113,7 +153,9 @@ function getSubspecialtyName(prefix: string): string {
     'ps': 'Posterior Segment',
     'no': 'Neuro-Ophthalmology and Orbit',
     'po': 'Pediatric Ophthalmology',
+    'ped': 'Pediatric Ophthalmology',
     'op': 'Optics',
+    'opt': 'Optics',
   };
   return map[prefix] || prefix;
 }
@@ -138,7 +180,7 @@ export function toggleBookmark(caseId: string): boolean {
   } else {
     bookmarks.push(caseId);
   }
-  localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks));
+  safeSetItem(BOOKMARKS_KEY, JSON.stringify(bookmarks));
   return index < 0;
 }
 
@@ -146,7 +188,9 @@ export function getBookmarks(): string[] {
   if (typeof window === 'undefined') return [];
   try {
     const data = localStorage.getItem(BOOKMARKS_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -156,11 +200,28 @@ export function isBookmarked(caseId: string): boolean {
   return getBookmarks().includes(caseId);
 }
 
+// Use LOCAL date for streak calculation (not UTC)
+function getLocalDateString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function getLocalYesterdayString(): string {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+}
+
 export function getStudyStreak(): { current: number; lastDate: string } {
   if (typeof window === 'undefined') return { current: 0, lastDate: '' };
   try {
     const data = localStorage.getItem(STREAK_KEY);
-    return data ? JSON.parse(data) : { current: 0, lastDate: '' };
+    if (!data) return { current: 0, lastDate: '' };
+    const parsed = JSON.parse(data);
+    if (typeof parsed === 'object' && parsed !== null && 'current' in parsed) {
+      return parsed;
+    }
+    return { current: 0, lastDate: '' };
   } catch {
     return { current: 0, lastDate: '' };
   }
@@ -168,14 +229,14 @@ export function getStudyStreak(): { current: number; lastDate: string } {
 
 export function updateStudyStreak(): number {
   if (typeof window === 'undefined') return 0;
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   const streak = getStudyStreak();
 
   if (streak.lastDate === today) return streak.current;
 
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const yesterday = getLocalYesterdayString();
   const newStreak = streak.lastDate === yesterday ? streak.current + 1 : 1;
-  localStorage.setItem(STREAK_KEY, JSON.stringify({ current: newStreak, lastDate: today }));
+  safeSetItem(STREAK_KEY, JSON.stringify({ current: newStreak, lastDate: today }));
   return newStreak;
 }
 

@@ -183,6 +183,20 @@ const SYNONYM_MAP: { [key: string]: string[] } = {
   'cross-linking': ['cxl', 'corneal cross-linking', 'collagen cross-linking', 'riboflavin uva'],
   'migs': ['minimally invasive glaucoma surgery', 'istent', 'trabectome', 'kahook', 'xen gel stent', 'goniotomy'],
 
+  // Missing high-yield synonyms
+  'hsv keratitis': ['herpes simplex keratitis', 'herpetic keratitis', 'dendritic ulcer', 'dendrite', 'herpes simplex virus'],
+  'herpes zoster ophthalmicus': ['hzo', 'shingles', 'varicella zoster', 'vzv', 'zoster ophthalmicus'],
+  'vkh': ['vogt koyanagi harada', 'vogt-koyanagi-harada', 'harada disease'],
+  'ifis': ['intraoperative floppy iris', 'floppy iris syndrome'],
+  'iol': ['intraocular lens', 'lens implant', 'pseudophakia', 'pciol', 'aciol'],
+  'amsler grid': ['amsler', 'amsler test', 'metamorphopsia grid'],
+  'pdt': ['photodynamic therapy', 'verteporfin', 'visudyne'],
+  'goldmann tonometry': ['gat', 'goldmann applanation', 'applanation tonometry'],
+  'pachymetry': ['corneal thickness', 'cct', 'central corneal thickness'],
+  'sympathetic ophthalmia': ['sympathetic uveitis', 'sympathetic inflammation'],
+  'iris bombe': ['seclusio pupillae', 'posterior synechiae 360'],
+  'phacomorphic glaucoma': ['phacomorphic', 'lens-induced glaucoma', 'phacolytic glaucoma', 'phacolytic', 'lens particle glaucoma'],
+
   // Anatomy
   'macula': ['fovea', 'foveal', 'macular', 'central retina'],
   'optic disc': ['optic nerve head', 'onh', 'disc', 'optic disk'],
@@ -235,21 +249,58 @@ function normalizeText(text: string): string {
 }
 
 function stemWord(word: string): string {
-  // Simple medical-aware stemming
+  // Medical-aware stemming — only stem suffixes that are safe
+  // Do NOT stem -itis (keratitis→kerat matches keratoconus falsely)
   return word
-    .replace(/itis$/, '')
-    .replace(/osis$/, '')
     .replace(/ectomy$/, '')
     .replace(/otomy$/, '')
     .replace(/plasty$/, '')
-    .replace(/tion$/, '')
-    .replace(/sion$/, '')
-    .replace(/ment$/, '')
     .replace(/ness$/, '')
-    .replace(/ing$/, '')
     .replace(/ies$/, 'y')
     .replace(/es$/, '')
     .replace(/s$/, '');
+}
+
+// Word-boundary-safe match: prevents "on" matching inside "observation"
+function wordBoundaryMatch(text: string, term: string): boolean {
+  if (term.length <= 3) {
+    // Short terms MUST match as whole words (word boundary)
+    const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    return regex.test(text);
+  }
+  // Longer terms can use substring matching
+  return text.includes(term);
+}
+
+// Simple Levenshtein distance for typo tolerance
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      const cost = b.charAt(i - 1) === a.charAt(j - 1) ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+// Check if any word in the answer is a close typo match for the term
+function fuzzyWordMatch(answer: string, term: string): boolean {
+  if (term.length < 5) return false; // Only fuzzy match longer words
+  const maxDist = term.length <= 7 ? 1 : 2; // Allow 1-2 typos based on word length
+  const answerWords = answer.split(/\s+/);
+  return answerWords.some(w => {
+    if (Math.abs(w.length - term.length) > maxDist) return false;
+    return levenshteinDistance(w, term) <= maxDist;
+  });
 }
 
 function findSynonyms(keyword: string): string[] {
@@ -257,7 +308,7 @@ function findSynonyms(keyword: string): string[] {
   const synonyms: string[] = [normalized];
 
   for (const [key, values] of Object.entries(SYNONYM_MAP)) {
-    if (normalized.includes(key) || values.some(v => normalized.includes(v))) {
+    if (wordBoundaryMatch(normalized, key) || values.some(v => wordBoundaryMatch(normalized, v))) {
       synonyms.push(key, ...values);
     }
   }
@@ -269,34 +320,37 @@ function checkKeywordMatch(userAnswer: string, keyword: string): boolean {
   const normalizedAnswer = normalizeText(userAnswer);
   const normalizedKeyword = normalizeText(keyword);
 
-  // Direct match
-  if (normalizedAnswer.includes(normalizedKeyword)) return true;
+  // Direct match (substring for longer terms, word-boundary for short)
+  if (wordBoundaryMatch(normalizedAnswer, normalizedKeyword)) return true;
 
-  // Synonym check
+  // Synonym check with word-boundary safety
   const synonyms = findSynonyms(normalizedKeyword);
-  if (synonyms.some(syn => normalizedAnswer.includes(syn))) return true;
+  if (synonyms.some(syn => wordBoundaryMatch(normalizedAnswer, syn))) return true;
 
-  // Check individual significant words (3+ chars) - more lenient threshold
-  const keywordWords = normalizedKeyword.split(' ').filter(w => w.length >= 3);
+  // Fuzzy/typo match for the full keyword
+  if (fuzzyWordMatch(normalizedAnswer, normalizedKeyword)) return true;
+
+  // Check individual significant words (4+ chars) - stricter threshold
+  const keywordWords = normalizedKeyword.split(' ').filter(w => w.length >= 4);
   if (keywordWords.length > 1) {
     const matchedWords = keywordWords.filter(w =>
-      normalizedAnswer.includes(w) ||
-      normalizedAnswer.includes(stemWord(w))
+      wordBoundaryMatch(normalizedAnswer, w) ||
+      wordBoundaryMatch(normalizedAnswer, stemWord(w)) ||
+      fuzzyWordMatch(normalizedAnswer, w)
     );
-    // Match if 50% of words match (more lenient)
     if (matchedWords.length >= Math.ceil(keywordWords.length * 0.5)) return true;
   }
 
-  // Stemmed word matching for single important medical terms
-  if (keywordWords.length === 1 && keywordWords[0].length >= 4) {
+  // Stemmed word matching for single important medical terms (5+ chars only)
+  if (keywordWords.length === 1 && keywordWords[0].length >= 5) {
     const stemmed = stemWord(keywordWords[0]);
-    if (stemmed.length >= 3 && normalizedAnswer.includes(stemmed)) return true;
+    if (stemmed.length >= 4 && wordBoundaryMatch(normalizedAnswer, stemmed)) return true;
   }
 
   // Check concept cluster partial credit
   for (const clusterTerms of Object.values(CONCEPT_CLUSTERS)) {
-    if (clusterTerms.some(t => normalizedKeyword.includes(t))) {
-      if (clusterTerms.some(t => normalizedAnswer.includes(t))) return true;
+    if (clusterTerms.some(t => wordBoundaryMatch(normalizedKeyword, t))) {
+      if (clusterTerms.some(t => wordBoundaryMatch(normalizedAnswer, t))) return true;
     }
   }
 
