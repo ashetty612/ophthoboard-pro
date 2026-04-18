@@ -10,8 +10,9 @@ import ReviewMode from "@/components/ReviewMode";
 import ExamMode from "@/components/ExamMode";
 import FlashcardMode from "@/components/FlashcardMode";
 import AIExaminer from "@/components/AIExaminer";
+import PPPBrowser from "@/components/PPPBrowser";
 
-type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner";
+type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp";
 
 // Custom SVG eye logo
 function EyeLogo({ size = 40 }: { size?: number }) {
@@ -186,6 +187,14 @@ export default function Home() {
     return (
       <AIExaminer
         database={database}
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
+      />
+    );
+  }
+
+  if (currentView === "ppp") {
+    return (
+      <PPPBrowser
         onBack={() => { setCurrentView("home"); scrollToTop(); }}
       />
     );
@@ -440,6 +449,11 @@ export default function Home() {
                   label: "AI Examiner", desc: "AI tutor, mock examiner & quiz", icon: "🤖",
                   iconBg: "bg-primary-500/10 text-primary-400", border: "border-primary-500/15",
                   action: () => setCurrentView("ai-examiner"),
+                },
+                {
+                  label: "Practice Patterns", desc: "AAO PPP guidelines & quizzes", icon: "📋",
+                  iconBg: "bg-teal-500/10 text-teal-400", border: "border-teal-500/15",
+                  action: () => setCurrentView("ppp"),
                 },
                 {
                   label: "Analytics", desc: "Performance analytics & insights", icon: "📊",

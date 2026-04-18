@@ -1,0 +1,959 @@
+{
+  "metadata": {
+    "title": "AAO Preferred Practice Patterns - Interactive Study Guide",
+    "source": "American Academy of Ophthalmology Preferred Practice Patterns",
+    "totalPPPs": 30,
+    "generatedAt": "2026-04-18"
+  },
+  "subspecialties": [
+    {
+      "id": "glaucoma",
+      "name": "Glaucoma",
+      "color": "#14b8a6",
+      "icon": "eye-pressure",
+      "ppps": [
+        {
+          "id": "poag",
+          "title": "Primary Open-Angle Glaucoma (POAG)",
+          "year": 2026,
+          "keyRecommendations": [
+            {"text": "Perform gonioscopy on all glaucoma suspects and patients to classify type of glaucoma", "strength": "Strong", "evidence": "Good"},
+            {"text": "Assess optic nerve head and RNFL with both clinical examination and imaging (OCT)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Set target IOP based on the extent of optic nerve damage and other risk factors; generally 25% reduction from baseline for early glaucoma", "strength": "Strong", "evidence": "Good"},
+            {"text": "Medical therapy (prostaglandin analogs) is the most common initial treatment", "strength": "Strong", "evidence": "Good"},
+            {"text": "Laser trabeculoplasty (SLT) may be used as initial therapy — LiGHT trial showed non-inferiority to drops", "strength": "Strong", "evidence": "Good"},
+            {"text": "Consider surgical intervention when medical and laser therapy fail to achieve target IOP or disease progresses", "strength": "Strong", "evidence": "Good"},
+            {"text": "Measure central corneal thickness as it affects IOP measurement accuracy (thin corneas underestimate, thick overestimate)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Perform visual field testing (standard automated perimetry, 24-2 or 30-2) at baseline and periodically", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Open angles on gonioscopy",
+            "Characteristic optic nerve damage (increased C/D ratio, notching, disc hemorrhage)",
+            "Corresponding visual field loss (arcuate scotoma, nasal step, paracentral defects)",
+            "IOP may or may not be elevated (normal tension glaucoma exists)",
+            "Absence of secondary causes"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Establish baseline: IOP (multiple readings), CCT, gonioscopy, optic nerve assessment, OCT RNFL/GCC, visual fields (24-2)"},
+            {"step": 2, "action": "Set target IOP: 25% reduction for early, 30-40% for moderate, >40% for severe glaucoma"},
+            {"step": 3, "action": "First-line treatment: prostaglandin analog (latanoprost, bimatoprost, travoprost) OR SLT"},
+            {"step": 4, "action": "If inadequate response: add second agent (beta-blocker timolol, alpha-agonist brimonidine, or CAI dorzolamide)"},
+            {"step": 5, "action": "If maximum medical therapy insufficient: consider laser (SLT if not already done, or cyclophotocoagulation)"},
+            {"step": 6, "action": "Surgical options: trabeculectomy, tube shunt (Ahmed, Baerveldt), MIGS (iStent, Hydrus, XEN gel stent, Kahook dual blade)"},
+            {"step": 7, "action": "Follow-up: every 3-6 months for stable disease, more frequently after treatment changes"}
+          ],
+          "followUp": "Every 3-12 months depending on severity and stability. More frequent early after diagnosis or treatment change. Annual visual fields and OCT minimum.",
+          "boardPearls": [
+            "OHTS trial: treatment of ocular hypertension reduces risk of developing POAG by ~50%",
+            "AGIS, CIGTS, EMGT — all landmark trials showing IOP lowering prevents progression",
+            "LiGHT trial: SLT as first-line was non-inferior to drops and more cost-effective at 3 years",
+            "Target IOP is not a fixed number — it must be individualized and reassessed",
+            "Prostaglandin analogs are first-line because of once-daily dosing, efficacy (25-33% IOP reduction), and minimal systemic side effects",
+            "Beta-blockers contraindicated in asthma, COPD, bradycardia, heart block",
+            "Brimonidine: avoid in children <2 years (CNS depression risk)",
+            "Disc hemorrhage is a sign of progression — lower the target IOP"
+          ],
+          "pitfalls": [
+            "Forgetting to measure CCT — thin corneas underestimate true IOP",
+            "Not performing gonioscopy — misclassifying angle-closure as open-angle",
+            "Using IOP alone to diagnose glaucoma — normal tension glaucoma exists",
+            "Not setting a specific target IOP — saying 'lower the pressure' is insufficient",
+            "Prescribing beta-blockers without checking for asthma/COPD/cardiac history"
+          ],
+          "quizQuestions": [
+            {"question": "What is the first-line medical therapy for POAG per AAO PPP?", "answer": "Prostaglandin analog (latanoprost, bimatoprost, travoprost, tafluprost)", "distractors": ["Beta-blocker (timolol)", "Alpha-agonist (brimonidine)", "Carbonic anhydrase inhibitor (dorzolamide)"]},
+            {"question": "Per the LiGHT trial, what was shown about SLT as initial therapy?", "answer": "SLT was non-inferior to medical therapy and more cost-effective at 3 years", "distractors": ["SLT was inferior to medical therapy", "SLT caused more complications", "SLT only works in pseudophakic patients"]},
+            {"question": "What target IOP reduction is recommended for early POAG?", "answer": "25% reduction from baseline", "distractors": ["10% reduction", "50% reduction", "IOP < 10 mmHg"]},
+            {"question": "Which landmark trial showed that treating ocular hypertension reduces POAG risk by ~50%?", "answer": "Ocular Hypertension Treatment Study (OHTS)", "distractors": ["AGIS", "CIGTS", "LiGHT trial"]}
+          ]
+        },
+        {
+          "id": "poag-suspect",
+          "title": "Primary Open-Angle Glaucoma Suspect",
+          "year": 2026,
+          "keyRecommendations": [
+            {"text": "Define POAG suspect as having one or more risk factors: elevated IOP, suspicious optic disc, family history, thin CCT", "strength": "Strong", "evidence": "Good"},
+            {"text": "Baseline evaluation includes IOP, CCT, gonioscopy, dilated fundus exam, OCT RNFL, and visual fields", "strength": "Strong", "evidence": "Good"},
+            {"text": "Treatment is NOT required for all suspects — individualize based on risk assessment", "strength": "Strong", "evidence": "Moderate"},
+            {"text": "Re-evaluate every 6-24 months depending on risk level", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "IOP > 21 mmHg without optic nerve damage",
+            "Suspicious optic nerve appearance without definitive damage",
+            "Strong family history of glaucoma",
+            "Thin central corneal thickness (<555 microns)",
+            "No visual field loss attributable to glaucoma"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Establish baseline: IOP (multiple readings at different times), CCT, gonioscopy, optic nerve assessment, OCT, visual fields"},
+            {"step": 2, "action": "Risk stratify: use OHTS risk calculator — age, IOP, CCT, cup-to-disc ratio, pattern standard deviation"},
+            {"step": 3, "action": "Low risk (<5%/5yr): observe every 12-24 months"},
+            {"step": 4, "action": "Moderate risk (5-15%/5yr): observe every 6-12 months, consider treatment if progression detected"},
+            {"step": 5, "action": "High risk (>15%/5yr): strongly consider initiating treatment"}
+          ],
+          "followUp": "Every 6-24 months based on risk stratification. Serial OCT and visual fields to detect conversion.",
+          "boardPearls": [
+            "Not all ocular hypertension needs treatment — risk stratification is key",
+            "OHTS showed that only ~10% of untreated OHT patients develop glaucoma at 5 years",
+            "CCT is a powerful independent risk factor — thin corneas = higher risk even at 'normal' IOP",
+            "Disc asymmetry >0.2 C/D ratio between eyes is suspicious for glaucoma",
+            "Pattern standard deviation (PSD) on visual fields is an early indicator of localized loss"
+          ],
+          "pitfalls": [
+            "Treating every patient with IOP > 21 — many never develop glaucoma",
+            "Not measuring CCT — critical for risk assessment",
+            "Using a single IOP reading — IOP fluctuates diurnally",
+            "Not getting baseline visual fields and OCT — you need them to detect progression later"
+          ],
+          "quizQuestions": [
+            {"question": "What percentage of untreated OHT patients develop POAG at 5 years per OHTS?", "answer": "Approximately 10%", "distractors": ["50%", "25%", "1%"]},
+            {"question": "Which CCT value is considered a risk factor for glaucoma development?", "answer": "< 555 microns (thin cornea)", "distractors": ["> 600 microns", "Exactly 540 microns", "CCT is not a risk factor"]}
+          ]
+        },
+        {
+          "id": "angle-closure",
+          "title": "Primary Angle-Closure Disease",
+          "year": 2026,
+          "keyRecommendations": [
+            {"text": "Perform gonioscopy on all patients with elevated IOP or narrow anterior chambers", "strength": "Strong", "evidence": "Good"},
+            {"text": "Laser peripheral iridotomy (LPI) is the initial treatment for primary angle closure (PAC) and acute angle-closure crisis", "strength": "Strong", "evidence": "Good"},
+            {"text": "ALWAYS treat the fellow eye prophylactically with LPI in acute angle closure", "strength": "Strong", "evidence": "Good"},
+            {"text": "In acute crisis: lower IOP medically first (timolol, brimonidine, pilocarpine 1-2%, acetazolamide, mannitol if needed)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Lens extraction (clear or cataractous) is increasingly recognized as a definitive treatment for angle closure — EAGLE study", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Primary angle-closure suspect (PACS): ≥180 degrees of iridotrabecular contact, no PAS, normal IOP, no optic neuropathy",
+            "Primary angle closure (PAC): iridotrabecular contact with elevated IOP or PAS, no optic neuropathy",
+            "Primary angle-closure glaucoma (PACG): angle closure with glaucomatous optic neuropathy",
+            "Acute angle-closure crisis: sudden IOP elevation with symptoms (pain, nausea, blurred vision, halos)"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "ACUTE CRISIS: Timolol 0.5% + Brimonidine 0.2% + Pilocarpine 1-2% + Acetazolamide 500mg IV/PO + Mannitol 20% IV if needed"},
+            {"step": 2, "action": "Perform LPI when cornea clears (may need glycerin to clear corneal edema)"},
+            {"step": 3, "action": "ALWAYS perform prophylactic LPI on the fellow eye"},
+            {"step": 4, "action": "Post-LPI: check IOP, gonioscopy to confirm angle opened"},
+            {"step": 5, "action": "If angle remains narrow post-LPI (plateau iris): consider argon laser peripheral iridoplasty"},
+            {"step": 6, "action": "Consider lens extraction if lens is a major component of the mechanism (EAGLE study supports this)"}
+          ],
+          "followUp": "24-48 hours after acute episode, then 1 week, 1 month, then every 3-6 months. Long-term monitoring for chronic angle closure development.",
+          "boardPearls": [
+            "EAGLE study: clear lens extraction was superior to LPI for controlling IOP in PACG",
+            "Acute angle closure is a TRUE EMERGENCY — delay can cause permanent vision loss",
+            "Fellow eye prophylactic LPI — forgetting this is a FATAL FLAW on boards",
+            "Pilocarpine may NOT work until IOP is lowered (sphincter ischemia at very high IOP)",
+            "Plateau iris: suspect if angle remains narrow after LPI — diagnosed with UBM or anterior segment OCT",
+            "Risk factors for angle closure: hyperopia, shallow AC, thick/anteriorly positioned lens, Asian descent, female, older age"
+          ],
+          "pitfalls": [
+            "Not treating the fellow eye with prophylactic LPI — this is a board exam fatal flaw",
+            "Giving pilocarpine first without lowering IOP — it won't work if IOP is very high",
+            "Not doing gonioscopy before and after LPI to confirm mechanism",
+            "Forgetting to consider plateau iris if angle stays narrow after LPI",
+            "Using mydriatics in a patient with narrow angles without doing LPI first"
+          ],
+          "quizQuestions": [
+            {"question": "What is the FIRST medication to give in acute angle-closure crisis?", "answer": "Timolol 0.5% + Brimonidine 0.2% (aqueous suppressants first, then pilocarpine when IOP starts to decrease)", "distractors": ["Pilocarpine 4%", "Oral acetazolamide only", "Atropine 1%"]},
+            {"question": "What did the EAGLE study demonstrate?", "answer": "Clear lens extraction was superior to LPI for IOP control in primary angle-closure disease", "distractors": ["SLT is better than LPI for angle closure", "LPI prevents all angle closure attacks", "Argon laser is superior to Nd:YAG for LPI"]},
+            {"question": "What must ALWAYS be done for the fellow eye in acute angle closure?", "answer": "Prophylactic laser peripheral iridotomy (LPI)", "distractors": ["Prophylactic pilocarpine only", "No treatment needed", "Prophylactic trabeculectomy"]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "retina",
+      "name": "Retina",
+      "color": "#f97316",
+      "icon": "retina",
+      "ppps": [
+        {
+          "id": "amd",
+          "title": "Age-Related Macular Degeneration (AMD)",
+          "year": 2024,
+          "keyRecommendations": [
+            {"text": "Recommend AREDS2 supplements for intermediate AMD or advanced AMD in one eye", "strength": "Strong", "evidence": "Good"},
+            {"text": "Anti-VEGF therapy is first-line for neovascular (wet) AMD", "strength": "Strong", "evidence": "Good"},
+            {"text": "Intravitreal injections of anti-VEGF agents should be initiated promptly upon diagnosis of wet AMD", "strength": "Strong", "evidence": "Good"},
+            {"text": "Regular monitoring with OCT to guide treatment decisions in wet AMD", "strength": "Strong", "evidence": "Good"},
+            {"text": "Complement inhibitors (pegcetacoplan, avacincaptad pegol) are now approved for geographic atrophy", "strength": "Moderate", "evidence": "Moderate"},
+            {"text": "Counsel patients about Amsler grid monitoring for early detection of conversion", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Early AMD: medium drusen (63-125 microns), no pigmentary changes",
+            "Intermediate AMD: large drusen (>125 microns) or pigmentary changes",
+            "Advanced dry AMD (geographic atrophy): well-defined areas of RPE/photoreceptor atrophy",
+            "Neovascular AMD: choroidal neovascularization (CNV) with fluid, hemorrhage, or exudate"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Classify AMD stage: early, intermediate, or advanced (dry vs wet)"},
+            {"step": 2, "action": "Early AMD: observe, lifestyle counseling (stop smoking, healthy diet, UV protection)"},
+            {"step": 3, "action": "Intermediate AMD: AREDS2 supplements (Vit C 500mg, Vit E 400IU, Zinc 80mg, Lutein 10mg, Zeaxanthin 2mg) — NO beta-carotene"},
+            {"step": 4, "action": "Wet AMD: intravitreal anti-VEGF injection (bevacizumab, ranibizumab, aflibercept, faricimab) — initiate promptly"},
+            {"step": 5, "action": "Follow wet AMD with monthly OCT; treat-and-extend or PRN dosing after loading doses"},
+            {"step": 6, "action": "Geographic atrophy: complement inhibitors (pegcetacoplan monthly, avacincaptad pegol monthly) to slow progression"},
+            {"step": 7, "action": "Low vision rehabilitation referral for advanced cases"}
+          ],
+          "followUp": "Wet AMD: monthly during loading phase, then per treat-and-extend protocol. Dry AMD: every 6-24 months depending on severity. Amsler grid daily.",
+          "boardPearls": [
+            "CATT trial: bevacizumab was non-inferior to ranibizumab for wet AMD — key for cost discussions",
+            "AREDS2 replaced beta-carotene with lutein/zeaxanthin — beta-carotene increases lung cancer risk in smokers",
+            "Faricimab is bispecific (anti-VEGF-A + anti-Ang-2) — allows longer treatment intervals (up to 16 weeks)",
+            "Geographic atrophy can now be treated — pegcetacoplan (C3 inhibitor) and avacincaptad pegol (C5 inhibitor)",
+            "Know the drusen size classification: small <63 microns, medium 63-125, large >125",
+            "OCT findings in wet AMD: subretinal fluid, intraretinal fluid, PED, subretinal hyperreflective material",
+            "Anti-VEGF agents do NOT cure wet AMD — lifelong monitoring and treatment required"
+          ],
+          "pitfalls": [
+            "Prescribing beta-carotene in AREDS2 formula — replaced with lutein/zeaxanthin due to lung cancer risk",
+            "Delaying anti-VEGF treatment in wet AMD — prompt treatment preserves vision",
+            "Not counseling about Amsler grid for home monitoring",
+            "Forgetting that bevacizumab is off-label but effective and much cheaper",
+            "Not knowing the new GA treatments (complement inhibitors)"
+          ],
+          "quizQuestions": [
+            {"question": "What AREDS2 supplement replaced beta-carotene and why?", "answer": "Lutein (10mg) and Zeaxanthin (2mg) replaced beta-carotene because beta-carotene increases lung cancer risk in smokers", "distractors": ["Vitamin A because of liver toxicity", "Omega-3 because of bleeding risk", "Nothing — beta-carotene was kept"]},
+            {"question": "What did the CATT trial demonstrate?", "answer": "Bevacizumab was non-inferior to ranibizumab for wet AMD treatment", "distractors": ["Ranibizumab was clearly superior", "Aflibercept was the best agent", "Laser was better than anti-VEGF"]},
+            {"question": "What is the mechanism of faricimab?", "answer": "Bispecific antibody targeting both VEGF-A and Angiopoietin-2 (Ang-2)", "distractors": ["Selective VEGF-A inhibitor only", "Complement C3 inhibitor", "PDGF inhibitor"]}
+          ]
+        },
+        {
+          "id": "diabetic-retinopathy",
+          "title": "Diabetic Retinopathy",
+          "year": 2024,
+          "keyRecommendations": [
+            {"text": "Screen type 1 DM patients within 5 years of diagnosis; type 2 DM at time of diagnosis", "strength": "Strong", "evidence": "Good"},
+            {"text": "Classify DR severity using ETDRS scale: mild/moderate/severe NPDR, PDR", "strength": "Strong", "evidence": "Good"},
+            {"text": "Anti-VEGF is first-line for center-involving diabetic macular edema (DME)", "strength": "Strong", "evidence": "Good"},
+            {"text": "PRP remains standard of care for high-risk PDR, though anti-VEGF (Protocol S) is an alternative", "strength": "Strong", "evidence": "Good"},
+            {"text": "Optimize systemic control: HbA1c, blood pressure, lipids — co-manage with PCP/endocrinology", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Mild NPDR: microaneurysms only",
+            "Moderate NPDR: microaneurysms + dot/blot hemorrhages, hard exudates, cotton-wool spots",
+            "Severe NPDR (4-2-1 rule): hemorrhages in 4 quadrants OR venous beading in 2+ quadrants OR IRMA in 1+ quadrant",
+            "PDR: neovascularization of disc (NVD) or elsewhere (NVE), vitreous/preretinal hemorrhage",
+            "DME: retinal thickening within 1 disc diameter of foveal center (center-involving vs non-center-involving)"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Classify DR severity and determine if DME is present"},
+            {"step": 2, "action": "Mild/moderate NPDR without DME: observation, optimize systemic control, follow every 6-12 months"},
+            {"step": 3, "action": "Severe NPDR: close follow-up every 2-4 months, consider early PRP if high risk of progression or poor follow-up"},
+            {"step": 4, "action": "PDR: PRP (panretinal photocoagulation) OR anti-VEGF therapy (Protocol S showed non-inferiority of ranibizumab to PRP at 2 years)"},
+            {"step": 5, "action": "Center-involving DME: anti-VEGF injection (Protocol T: aflibercept for VA ≤20/50; all agents equivalent for VA ≥20/40)"},
+            {"step": 6, "action": "Non-center-involving DME: observation or focal/grid laser if progression or threatening fovea"},
+            {"step": 7, "action": "Vitrectomy for: non-clearing vitreous hemorrhage (1-3 months), tractional retinal detachment involving macula"}
+          ],
+          "followUp": "Mild NPDR: 12 months. Moderate NPDR: 6-12 months. Severe NPDR: 2-4 months. PDR: 2-4 months. DME on treatment: monthly during loading phase.",
+          "boardPearls": [
+            "4-2-1 rule for severe NPDR: 4 quadrants of hemorrhages, 2+ quadrants venous beading, 1+ quadrant IRMA — ANY ONE qualifies",
+            "DRCR.net Protocol T: aflibercept > bevacizumab/ranibizumab for DME with VA ≤20/50 at year 1",
+            "Protocol S: anti-VEGF (ranibizumab) was non-inferior to PRP for PDR at 2 years with better visual outcomes",
+            "DRS/ETDRS: PRP reduces severe vision loss by ~50% in high-risk PDR",
+            "Pregnancy can accelerate diabetic retinopathy — screen each trimester",
+            "Rapid improvement in glycemic control can temporarily worsen DR — 'early worsening'",
+            "Rubeosis iridis (NVI) indicates ischemia — may need PRP urgently to prevent NVG"
+          ],
+          "pitfalls": [
+            "Not knowing the 4-2-1 rule for severe NPDR classification",
+            "Using focal laser as first-line for center-involving DME instead of anti-VEGF",
+            "Not screening type 2 DM at diagnosis — many already have retinopathy",
+            "Forgetting to mention systemic optimization (HbA1c, BP, lipids)",
+            "Not warning pregnant patients with DM about worsening retinopathy risk"
+          ],
+          "quizQuestions": [
+            {"question": "What defines severe NPDR using the 4-2-1 rule?", "answer": "Hemorrhages in 4 quadrants OR venous beading in 2+ quadrants OR IRMA in 1+ quadrant — ANY ONE qualifies", "distractors": ["All three must be present", "Only hemorrhages in 4 quadrants", "NVD or NVE present"]},
+            {"question": "Per DRCR.net Protocol T, which anti-VEGF is best for DME with VA 20/50 or worse?", "answer": "Aflibercept (superior at 1 year for VA ≤20/50)", "distractors": ["All agents are equally effective at all VA levels", "Bevacizumab is always the best choice", "Ranibizumab is always superior"]},
+            {"question": "When should type 2 DM patients first be screened for retinopathy?", "answer": "At the time of diagnosis of diabetes", "distractors": ["5 years after diagnosis", "10 years after diagnosis", "Only when symptoms develop"]}
+          ]
+        },
+        {
+          "id": "rvo",
+          "title": "Retinal Vein Occlusions (RVO)",
+          "year": 2024,
+          "keyRecommendations": [
+            {"text": "Anti-VEGF is first-line treatment for macular edema from CRVO and BRVO", "strength": "Strong", "evidence": "Good"},
+            {"text": "Monitor for neovascularization, especially NVI/NVA after CRVO (neovascular glaucoma risk)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Systemic workup: blood pressure, blood glucose, CBC, lipid panel; hypercoagulability workup for young patients or bilateral RVO", "strength": "Strong", "evidence": "Good"},
+            {"text": "PRP for neovascularization secondary to ischemic CRVO", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "BRVO: flame-shaped hemorrhages in one sector of retina following venous distribution",
+            "CRVO: diffuse retinal hemorrhages in all quadrants, dilated tortuous veins, disc edema, cotton wool spots",
+            "Ischemic CRVO: >10 disc areas of non-perfusion on FFA, VA typically <20/200, RAPD present"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Confirm diagnosis, determine type (BRVO vs CRVO), assess for ischemia (FFA if needed)"},
+            {"step": 2, "action": "Systemic workup: BP, glucose, CBC, lipids; hypercoagulability panel if young or bilateral"},
+            {"step": 3, "action": "Macular edema: anti-VEGF injection (BRAVO/CRUISE trials support ranibizumab; also bevacizumab, aflibercept effective)"},
+            {"step": 4, "action": "Alternative for macular edema: dexamethasone intravitreal implant (Ozurdex) especially in pseudophakic patients"},
+            {"step": 5, "action": "Monitor for neovascularization (NVI, NVD, NVE) — PRP if present"},
+            {"step": 6, "action": "Ischemic CRVO: close follow-up every 1-2 months for NVG development, PRP if neovascularization develops"},
+            {"step": 7, "action": "BRVO: if no improvement with anti-VEGF, consider grid laser for persistent macular edema"}
+          ],
+          "followUp": "Monthly during active treatment. Every 1-3 months during monitoring phase. Watch for NVG development in ischemic CRVO for at least 6 months.",
+          "boardPearls": [
+            "BRAVO/CRUISE trials: ranibizumab effective for macular edema in BRVO/CRVO",
+            "Ischemic CRVO: '90-day glaucoma' — NVG can develop 2-4 months after CRVO",
+            "Check for NVI at every visit in CRVO patients — use gonioscopy",
+            "Young patients with RVO: consider hypercoagulability workup (protein C, S, antithrombin III, factor V Leiden, antiphospholipid antibodies)",
+            "Dexamethasone implant (Ozurdex): good alternative especially in pseudophakic patients (steroid-induced cataract not a concern)",
+            "SCORE study: intravitreal triamcinolone for CRVO macular edema was effective but with IOP/cataract risks"
+          ],
+          "pitfalls": [
+            "Not checking for NVI/NVA in CRVO patients — neovascular glaucoma can develop rapidly",
+            "Forgetting systemic workup — RVO has systemic vascular risk factor implications",
+            "Not doing hypercoagulability workup in young patients",
+            "Using intravitreal steroids in phakic patients without discussing cataract/IOP risks"
+          ],
+          "quizQuestions": [
+            {"question": "What is the '90-day glaucoma' associated with ischemic CRVO?", "answer": "Neovascular glaucoma (NVG) developing 2-4 months after ischemic CRVO due to rubeosis iridis", "distractors": ["Steroid-induced glaucoma", "Angle recession glaucoma", "Pigmentary glaucoma"]},
+            {"question": "What is first-line treatment for macular edema from CRVO?", "answer": "Intravitreal anti-VEGF injection", "distractors": ["Grid laser photocoagulation", "Observation for 3 months", "Oral steroids"]}
+          ]
+        },
+        {
+          "id": "rao",
+          "title": "Retinal and Ophthalmic Artery Occlusions",
+          "year": 2024,
+          "keyRecommendations": [
+            {"text": "CRAO is a stroke equivalent — urgent systemic stroke workup required", "strength": "Strong", "evidence": "Good"},
+            {"text": "Immediate interventions (within hours): ocular massage, anterior chamber paracentesis, IOP-lowering agents", "strength": "Moderate", "evidence": "Limited"},
+            {"text": "Refer for urgent carotid evaluation and cardiac workup", "strength": "Strong", "evidence": "Good"},
+            {"text": "Rule out giant cell arteritis in patients >50 with any arterial occlusion", "strength": "Strong", "evidence": "Good"},
+            {"text": "Intra-arterial thrombolysis may be considered within 4.5 hours (EAGLE study) but remains controversial", "strength": "Discretionary", "evidence": "Limited"}
+          ],
+          "diagnosticCriteria": [
+            "CRAO: sudden painless vision loss, cherry red spot, pale/edematous retina, attenuated arterioles, boxcar segmentation",
+            "BRAO: sectoral retinal whitening in distribution of affected arteriole",
+            "Ophthalmic artery occlusion: no cherry red spot (choroidal circulation also affected), severe vision loss"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "EMERGENCY: Immediate ocular massage (intermittent digital pressure), AC paracentesis to lower IOP rapidly"},
+            {"step": 2, "action": "Topical IOP-lowering: timolol 0.5%, systemic acetazolamide 500mg IV"},
+            {"step": 3, "action": "Check ESR, CRP, CBC urgently — rule out GCA if age >50"},
+            {"step": 4, "action": "If GCA suspected: start IV methylprednisolone 1g/day x 3 days immediately, temporal artery biopsy within 2 weeks"},
+            {"step": 5, "action": "Urgent stroke workup: carotid Doppler, echocardiogram, cardiac monitoring, brain MRI/CT"},
+            {"step": 6, "action": "Cardiology/neurology co-management for secondary prevention (antiplatelets, statins, BP control)"}
+          ],
+          "followUp": "Daily for first week if GCA suspected. Then every 1-4 weeks. Long-term vascular risk management with PCP/cardiology.",
+          "boardPearls": [
+            "CRAO is a stroke equivalent — same urgency as a cerebral stroke",
+            "Cherry red spot = fovea appears red because it is supplied by choroid (visible through thin fovea) while surrounding ischemic retina is pale",
+            "GCA must be ruled out in ALL patients >50 — start steroids BEFORE biopsy",
+            "Arteritic CRAO (GCA) vs non-arteritic: arteritic has worse prognosis, bilateral risk, and systemic threat to life",
+            "Window for treatment is very narrow — retinal tolerance time for ischemia is ~90 minutes",
+            "Hollenhorst plaque (cholesterol embolus) = carotid disease; calcific plaque = cardiac valve disease"
+          ],
+          "pitfalls": [
+            "Not checking ESR/CRP in patients >50 — GCA can cause bilateral blindness and systemic complications",
+            "Waiting for biopsy results before starting steroids for suspected GCA",
+            "Not performing urgent carotid/cardiac workup — CRAO predicts stroke risk",
+            "Confusing ophthalmic artery occlusion with CRAO — no cherry red spot in OAO"
+          ],
+          "quizQuestions": [
+            {"question": "Why is CRAO considered a 'stroke equivalent'?", "answer": "It shares the same vascular risk factors and pathophysiology as cerebral stroke, and patients are at high risk for subsequent stroke", "distractors": ["Because it always occurs with concurrent stroke", "Because treatment is the same as stroke", "Because it affects the same blood vessels"]},
+            {"question": "In suspected GCA with CRAO, when should steroids be started?", "answer": "Immediately — BEFORE temporal artery biopsy results are available", "distractors": ["After biopsy confirms GCA", "After ESR results return", "Only if CRP is elevated"]}
+          ]
+        },
+        {
+          "id": "pvd-rd",
+          "title": "PVD, Retinal Breaks, and Lattice Degeneration",
+          "year": 2024,
+          "keyRecommendations": [
+            {"text": "Dilated fundus exam with scleral depression for patients with symptoms of acute PVD (flashes, floaters)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Horseshoe tears with symptoms: treat with laser photocoagulation or cryotherapy", "strength": "Strong", "evidence": "Good"},
+            {"text": "Asymptomatic horseshoe tears: treatment is recommended, especially if fellow eye had RD", "strength": "Strong", "evidence": "Moderate"},
+            {"text": "Asymptomatic round holes: generally observe unless high-risk features present", "strength": "Strong", "evidence": "Moderate"},
+            {"text": "Lattice degeneration without symptoms or breaks: observation usually sufficient", "strength": "Strong", "evidence": "Moderate"}
+          ],
+          "diagnosticCriteria": [
+            "PVD: Weiss ring, pigmented cells (Shafer sign = tobacco dust = concerning for retinal break)",
+            "Horseshoe tear: U-shaped retinal break with vitreous traction on flap",
+            "Operculated hole: round hole with free-floating operculum (lower risk than horseshoe tear)",
+            "Lattice degeneration: circumferentially oriented area of retinal thinning with overlying vitreous liquefaction"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Symptomatic PVD: dilated exam with scleral depression within 24 hours"},
+            {"step": 2, "action": "If retinal break found: laser photocoagulation (3 rows around break) or cryotherapy"},
+            {"step": 3, "action": "If no break on initial exam: repeat exam in 4-6 weeks (delayed retinal breaks can occur)"},
+            {"step": 4, "action": "Symptomatic horseshoe tear: treat urgently"},
+            {"step": 5, "action": "Asymptomatic horseshoe tear: treat (especially if fellow eye had RD, aphakia/pseudophakia, high myopia)"},
+            {"step": 6, "action": "Lattice degeneration: treat only if symptomatic breaks within it, or prophylactically if fellow eye had RD from lattice"}
+          ],
+          "followUp": "After PVD symptoms: recheck in 4-6 weeks, then PRN. After laser treatment: 1-2 weeks to confirm treatment effect.",
+          "boardPearls": [
+            "Shafer sign (tobacco dust/pigmented cells in anterior vitreous) = pathognomonic for retinal break — do NOT dismiss this finding",
+            "50% of retinal detachments start from horseshoe tears",
+            "Lattice degeneration is present in ~8% of the population — most never develop RD",
+            "Fellow eye of RD patient has ~10% risk of developing RD — prophylactic treatment of breaks is warranted",
+            "Lightning flashes (photopsia) = vitreous traction on retina — must rule out retinal break",
+            "New shower of floaters is more concerning than a single long-standing floater"
+          ],
+          "pitfalls": [
+            "Not performing scleral depression — peripheral breaks can be missed without it",
+            "Not rechecking in 4-6 weeks after negative initial exam for PVD symptoms — delayed breaks occur",
+            "Treating all lattice degeneration prophylactically — only treat if breaks present or high-risk features",
+            "Missing the Shafer sign — check the anterior vitreous carefully"
+          ],
+          "quizQuestions": [
+            {"question": "What is the Shafer sign and what does it indicate?", "answer": "Pigmented cells (tobacco dust) in the anterior vitreous — pathognomonic for a retinal break", "distractors": ["Vitreous hemorrhage indicating diabetic retinopathy", "White cells indicating uveitis", "Cholesterol crystals indicating asteroid hyalosis"]},
+            {"question": "When should a patient with new PVD symptoms be re-examined if the initial exam is negative?", "answer": "In 4-6 weeks (delayed retinal breaks can develop)", "distractors": ["No follow-up needed if initial exam is negative", "In 6 months", "Only if symptoms worsen"]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cornea-external",
+      "name": "Cornea & External Disease",
+      "color": "#3b82f6",
+      "icon": "cornea",
+      "ppps": [
+        {
+          "id": "blepharitis",
+          "title": "Blepharitis",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Blepharitis is a chronic condition — counsel patients that it is managed, not cured", "strength": "Strong", "evidence": "Good"},
+            {"text": "Lid hygiene (warm compresses, lid scrubs) is the foundation of treatment", "strength": "Strong", "evidence": "Good"},
+            {"text": "Topical antibiotics (erythromycin ointment, bacitracin) for anterior blepharitis", "strength": "Strong", "evidence": "Good"},
+            {"text": "Oral doxycycline or azithromycin for moderate-severe posterior blepharitis (meibomian gland dysfunction)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Consider Demodex testing if refractory — treat with tea tree oil-based lid scrubs or ivermectin", "strength": "Moderate", "evidence": "Moderate"}
+          ],
+          "diagnosticCriteria": [
+            "Anterior blepharitis: collarettes/scurf on lashes (staphylococcal), greasy scales (seborrheic)",
+            "Posterior blepharitis (MGD): thickened/turbid meibomian gland secretions, gland dropout, lid margin telangiectasia",
+            "Demodex blepharitis: cylindrical dandruff (collarettes) at base of lashes, refractory to standard treatment"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Warm compresses BID (5-10 minutes) + lid scrubs (dilute baby shampoo or commercial lid wipes)"},
+            {"step": 2, "action": "Anterior blepharitis: erythromycin or bacitracin ointment to lid margins QHS"},
+            {"step": 3, "action": "Posterior blepharitis/MGD: meibomian gland expression, omega-3 supplements, topical azithromycin"},
+            {"step": 4, "action": "Moderate-severe: oral doxycycline 50-100mg BID (or azithromycin pulsed dosing) for 6-12 weeks"},
+            {"step": 5, "action": "Refractory: consider Demodex (tea tree oil scrubs, ivermectin), thermal pulsation devices (LipiFlow), IPL"},
+            {"step": 6, "action": "Associated dry eye: preservative-free artificial tears QID, topical cyclosporine or lifitegrast"}
+          ],
+          "followUp": "4-6 weeks after initiating treatment. Then every 3-6 months for maintenance. Emphasize chronic nature and maintenance therapy.",
+          "boardPearls": [
+            "Blepharitis is MANAGED, not CURED — always counsel on chronicity",
+            "Demodex: look for cylindrical dandruff at lash base — this is the hallmark finding",
+            "Doxycycline: anti-inflammatory at low doses (40mg daily), antibiotic at higher doses. Avoid in pregnancy, children <8 years, photosensitivity warning",
+            "MGD is the #1 cause of evaporative dry eye",
+            "Rosacea-associated blepharitis: look for facial telangiectasia, rhinophyma — treat the skin disease too (metronidazole gel)",
+            "Severe posterior blepharitis can cause corneal complications: phlyctenules, marginal infiltrates, corneal vascularization"
+          ],
+          "pitfalls": [
+            "Telling patients blepharitis is 'curable' — it is a chronic condition requiring ongoing management",
+            "Prescribing doxycycline to pregnant women or children under 8",
+            "Not looking for Demodex in refractory cases",
+            "Forgetting to treat associated dry eye disease"
+          ],
+          "quizQuestions": [
+            {"question": "What is the hallmark finding of Demodex blepharitis?", "answer": "Cylindrical dandruff (collarettes) at the base of eyelashes", "distractors": ["Greasy scales on lashes", "Madarosis (lash loss)", "Ulcerative lesions on lid margin"]},
+            {"question": "Why should doxycycline NOT be used in children under 8?", "answer": "Risk of permanent tooth discoloration and dental enamel hypoplasia", "distractors": ["Risk of liver failure", "Risk of optic neuritis", "Risk of hearing loss"]}
+          ]
+        },
+        {
+          "id": "dry-eye",
+          "title": "Dry Eye Syndrome",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Classify dry eye as aqueous-deficient, evaporative, or mixed", "strength": "Strong", "evidence": "Good"},
+            {"text": "Stepwise treatment approach: education/environmental modifications → artificial tears → anti-inflammatory therapy → advanced options", "strength": "Strong", "evidence": "Good"},
+            {"text": "Topical cyclosporine (Restasis) or lifitegrast (Xiidra) for moderate-severe inflammatory dry eye", "strength": "Strong", "evidence": "Good"},
+            {"text": "Punctal plugs for aqueous-deficient dry eye after controlling inflammation", "strength": "Strong", "evidence": "Good"},
+            {"text": "Screen for systemic causes: Sjogren syndrome, rheumatoid arthritis, medications", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Symptoms: burning, foreign body sensation, tearing (reflex), fluctuating vision",
+            "Signs: reduced TBUT (<10 seconds), reduced Schirmer test (<5mm/5min), corneal/conjunctival staining (fluorescein, lissamine green)",
+            "Meibomian gland dysfunction: thickened secretions, gland dropout on meibography",
+            "Sjogren syndrome: dry eyes + dry mouth + positive autoantibodies (anti-SSA/Ro, anti-SSB/La)"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Education: environmental modifications (humidifier, avoid fans/heaters), screen breaks (20-20-20 rule), omega-3 supplements"},
+            {"step": 2, "action": "Artificial tears: preservative-free tears QID or more frequently; ointment at bedtime for severe cases"},
+            {"step": 3, "action": "Anti-inflammatory: topical cyclosporine 0.05% BID or lifitegrast 5% BID; short course of topical steroid to bridge"},
+            {"step": 4, "action": "Punctal occlusion: after controlling inflammation; start with temporary plugs, then permanent if effective"},
+            {"step": 5, "action": "Advanced: autologous serum tears, amniotic membrane, scleral contact lenses, salivary gland transplantation"},
+            {"step": 6, "action": "MGD-specific: warm compresses, LipiFlow, IPL, oral doxycycline"}
+          ],
+          "followUp": "4-8 weeks after starting anti-inflammatory therapy. Then every 3-6 months. Chronic management required.",
+          "boardPearls": [
+            "Dry eye is the most common reason for ophthalmology visits",
+            "Evaporative dry eye (MGD) is more common than aqueous-deficient",
+            "Sjogren syndrome workup: anti-SSA (Ro), anti-SSB (La), ANA, RF, lip biopsy",
+            "Cyclosporine takes 3-6 months for full effect — bridge with short course of topical steroids",
+            "Do NOT place punctal plugs in actively inflamed eyes — will trap inflammatory mediators",
+            "Medications that worsen dry eye: antihistamines, decongestants, antidepressants, beta-blockers, isotretinoin"
+          ],
+          "pitfalls": [
+            "Placing punctal plugs before controlling inflammation — traps inflammatory cytokines",
+            "Not asking about medications that worsen dry eye",
+            "Not screening for Sjogren syndrome in appropriate patients",
+            "Using preserved artificial tears more than QID — preservatives cause toxicity"
+          ],
+          "quizQuestions": [
+            {"question": "Why should punctal plugs NOT be placed in actively inflamed dry eyes?", "answer": "They trap inflammatory mediators on the ocular surface, potentially worsening the condition", "distractors": ["They dissolve too quickly in inflamed tissue", "They cause allergic reactions", "They increase IOP"]},
+            {"question": "What autoantibodies are tested in suspected Sjogren syndrome?", "answer": "Anti-SSA (Ro) and anti-SSB (La)", "distractors": ["Anti-dsDNA and anti-Smith", "p-ANCA and c-ANCA", "Anti-CCP and RF only"]}
+          ]
+        },
+        {
+          "id": "conjunctivitis",
+          "title": "Conjunctivitis",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Most conjunctivitis is viral — antibiotics are NOT routinely needed", "strength": "Strong", "evidence": "Good"},
+            {"text": "Bacterial conjunctivitis: topical antibiotics (fluoroquinolone or erythromycin) for 5-7 days", "strength": "Strong", "evidence": "Good"},
+            {"text": "Hyperacute conjunctivitis (severe purulent discharge): MUST rule out gonococcal — culture and Gram stain urgently", "strength": "Strong", "evidence": "Good"},
+            {"text": "Allergic conjunctivitis: topical antihistamine/mast cell stabilizers (olopatadine), cool compresses", "strength": "Strong", "evidence": "Good"},
+            {"text": "Contact lens wearers with red eye: discontinue lenses, treat as possible microbial keratitis until proven otherwise", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Viral: watery discharge, follicles, preauricular lymphadenopathy, often bilateral, recent URI",
+            "Bacterial: mucopurulent discharge, papillae, morning crusting, often unilateral initially",
+            "Allergic: itching (hallmark), watery/mucoid discharge, papillae, bilateral, seasonal pattern",
+            "Hyperacute (gonococcal): copious purulent discharge, lid swelling, rapid onset — emergency"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Determine type: viral vs bacterial vs allergic based on history and exam"},
+            {"step": 2, "action": "Viral: supportive (cool compresses, artificial tears, hand hygiene), contagious for 10-14 days"},
+            {"step": 3, "action": "Bacterial: topical antibiotic (erythromycin ointment, fluoroquinolone drops) for 5-7 days"},
+            {"step": 4, "action": "Hyperacute (suspected GC): Gram stain + culture urgently, systemic ceftriaxone 1g IM + topical erythromycin, daily lavage"},
+            {"step": 5, "action": "Allergic: topical antihistamine/mast cell stabilizer (olopatadine BID), cool compresses, avoid allergens"},
+            {"step": 6, "action": "Chlamydial: oral azithromycin 1g single dose + topical erythromycin; treat sexual partners"}
+          ],
+          "followUp": "Viral: 2-3 weeks for resolution. Bacterial: if no improvement in 48-72 hours, reculture. Hyperacute: daily until improving. Allergic: seasonal management plan.",
+          "boardPearls": [
+            "Itching = allergic conjunctivitis; purulent discharge = bacterial; watery + preauricular node = viral",
+            "Gonococcal conjunctivitis can perforate the cornea within 24-48 hours — this is an emergency",
+            "Adenovirus is the most common cause of viral conjunctivitis — highly contagious",
+            "EKC (epidemic keratoconjunctivitis): subepithelial infiltrates can persist for months — treat with low-dose topical steroid if visually significant",
+            "Chlamydial conjunctivitis: chronic follicular conjunctivitis in young adults — always treat systemically + treat partners"
+          ],
+          "pitfalls": [
+            "Prescribing antibiotics for viral conjunctivitis — this is unnecessary and contributes to resistance",
+            "Missing gonococcal conjunctivitis — rapid corneal perforation risk",
+            "Not treating sexual partners in chlamydial conjunctivitis",
+            "Using topical steroids in HSV keratitis masquerading as conjunctivitis"
+          ],
+          "quizQuestions": [
+            {"question": "What is the hallmark symptom that distinguishes allergic from other types of conjunctivitis?", "answer": "Itching (pruritus)", "distractors": ["Pain", "Discharge", "Redness"]},
+            {"question": "What is the treatment for suspected gonococcal conjunctivitis?", "answer": "Systemic ceftriaxone 1g IM + topical erythromycin + cultures", "distractors": ["Topical fluoroquinolone drops only", "Oral azithromycin only", "Observation"]}
+          ]
+        },
+        {
+          "id": "corneal-ectasia",
+          "title": "Corneal Ectasia (Keratoconus)",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Corneal cross-linking (CXL) is recommended for progressive keratoconus to halt progression", "strength": "Strong", "evidence": "Good"},
+            {"text": "Contact lens fitting (rigid gas-permeable, scleral) is the mainstay of visual rehabilitation", "strength": "Strong", "evidence": "Good"},
+            {"text": "Monitor for progression with serial corneal topography", "strength": "Strong", "evidence": "Good"},
+            {"text": "Corneal transplantation (DALK or PK) for advanced cases not manageable with contact lenses", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Corneal thinning and protrusion (usually inferotemporal)",
+            "Topography: inferior steepening, asymmetric bowtie pattern, skewed radial axes",
+            "Signs: Vogt striae, Fleischer ring, Munson sign (V-shaped indentation of lower lid on downgaze)",
+            "Tomography (Pentacam): thin pachymetry, elevated posterior float, abnormal indices"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Diagnose and stage severity: mild, moderate, advanced keratoconus based on K values, pachymetry, visual function"},
+            {"step": 2, "action": "If progressive: corneal cross-linking (CXL) — riboflavin + UVA, minimum corneal thickness 400 microns"},
+            {"step": 3, "action": "Visual rehabilitation: glasses (mild), RGP contact lenses (moderate), scleral lenses (advanced)"},
+            {"step": 4, "action": "Intracorneal ring segments (ICRS/Intacs) for patients intolerant of contact lenses with clear central cornea"},
+            {"step": 5, "action": "Corneal transplant: DALK (deep anterior lamellar keratoplasty) preferred over PK when possible — lower rejection risk"},
+            {"step": 6, "action": "Acute hydrops: topical hypertonic saline, cycloplegia, NOT immediate surgery — wait for edema to resolve"}
+          ],
+          "followUp": "Every 6-12 months with serial topography/tomography for progression monitoring. More frequently if young patient or recent CXL.",
+          "boardPearls": [
+            "CXL stops progression in >95% of cases — this is a game-changer for young patients",
+            "Minimum corneal thickness for standard CXL: 400 microns (risk of endothelial damage if thinner)",
+            "DALK preserves host endothelium — lower rejection risk than PK",
+            "Acute hydrops = Descemet membrane rupture — treat conservatively, NOT with immediate surgery",
+            "Keratoconus associations: Down syndrome, atopy, eye rubbing, Leber congenital amaurosis",
+            "Munson sign, Vogt striae, Fleischer ring — know these classic signs"
+          ],
+          "pitfalls": [
+            "Operating on acute hydrops — wait for edema to resolve (weeks to months)",
+            "Not screening for keratoconus before refractive surgery — LASIK on keratoconus = ectasia",
+            "Performing CXL on corneas <400 microns without hypoosmolar riboflavin protocol",
+            "Not counseling patients to stop eye rubbing — this accelerates progression"
+          ],
+          "quizQuestions": [
+            {"question": "What is the minimum corneal thickness required for standard corneal cross-linking?", "answer": "400 microns", "distractors": ["500 microns", "300 microns", "550 microns"]},
+            {"question": "What is the correct management of acute hydrops in keratoconus?", "answer": "Conservative treatment (hypertonic saline, cycloplegia) — NOT immediate surgery", "distractors": ["Emergency penetrating keratoplasty", "Immediate DALK", "Intracorneal ring segment placement"]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pediatric-strabismus",
+      "name": "Pediatric & Strabismus",
+      "color": "#a855f7",
+      "icon": "child",
+      "ppps": [
+        {
+          "id": "amblyopia",
+          "title": "Amblyopia",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Amblyopia screening should begin in infancy and at every well-child visit", "strength": "Strong", "evidence": "Good"},
+            {"text": "Full cycloplegic refraction is essential before treatment — correct refractive error first", "strength": "Strong", "evidence": "Good"},
+            {"text": "Patching 2 hours/day is as effective as 6 hours/day for moderate amblyopia (PEDIG)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Atropine penalization (1% to sound eye) is an effective alternative to patching", "strength": "Strong", "evidence": "Good"},
+            {"text": "Treatment can be effective up to age 17, but earlier treatment yields better outcomes", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Reduced best-corrected VA in one or both eyes without structural abnormality",
+            "Types: strabismic, refractive (anisometropic or isoametropic), deprivation (most severe)",
+            "At least 2-line interocular difference or VA below age-expected norms"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Full cycloplegic refraction (atropine 1% or cyclopentolate 1%) — correct refractive error first"},
+            {"step": 2, "action": "Glasses trial for 16-18 weeks before adding patching — refractive correction alone may resolve amblyopia"},
+            {"step": 3, "action": "Moderate amblyopia (20/40 to 20/100): patch better eye 2 hours/day OR atropine 1% to better eye on weekends"},
+            {"step": 4, "action": "Severe amblyopia (20/100 to 20/400): patch better eye 6 hours/day"},
+            {"step": 5, "action": "Continue treatment until VA stabilizes (no improvement over 2-3 consecutive visits)"},
+            {"step": 6, "action": "Maintenance/weaning: taper patching gradually to prevent recurrence"}
+          ],
+          "followUp": "Every 6-12 weeks during active treatment. Then every 3-6 months during maintenance. Monitor until visual maturity (~age 10).",
+          "boardPearls": [
+            "PEDIG ATS: 2 hours/day patching is as effective as 6 hours/day for moderate amblyopia",
+            "Atropine penalization: weekend-only atropine can be effective for moderate amblyopia",
+            "Refractive correction alone resolves amblyopia in ~30% of cases — always try glasses first",
+            "Deprivation amblyopia is the MOST SEVERE form — congenital cataracts must be removed within 6-8 weeks",
+            "Treatment beyond the 'critical period': PEDIG showed benefit up to age 17, challenging old dogma",
+            "Recurrence rate is ~25% after stopping treatment — taper gradually"
+          ],
+          "pitfalls": [
+            "Starting patching before giving adequate glasses trial (16-18 weeks)",
+            "Patching too aggressively in young children — can cause reverse amblyopia in the patched eye",
+            "Telling parents 'it is too late' for treatment in older children — benefit shown up to age 17",
+            "Not treating the underlying cause (strabismus, cataract) in addition to the amblyopia"
+          ],
+          "quizQuestions": [
+            {"question": "Per PEDIG, how many hours of patching is needed for moderate amblyopia?", "answer": "2 hours per day (shown to be as effective as 6 hours)", "distractors": ["Full-time patching (all waking hours)", "6 hours per day minimum", "30 minutes per day"]},
+            {"question": "What should be done BEFORE starting patching for amblyopia?", "answer": "Full cycloplegic refraction and adequate trial of glasses alone (16-18 weeks)", "distractors": ["Strabismus surgery first", "Immediate patching without glasses", "OCT of the optic nerve"]}
+          ]
+        },
+        {
+          "id": "esotropia-exotropia",
+          "title": "Esotropia and Exotropia",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Full cycloplegic refraction is the FIRST step for any child with esotropia", "strength": "Strong", "evidence": "Good"},
+            {"text": "Accommodative esotropia: full hyperopic correction is the treatment — surgery only for non-accommodative residual", "strength": "Strong", "evidence": "Good"},
+            {"text": "Infantile esotropia: surgical correction ideally between 6-24 months for best binocular outcome", "strength": "Strong", "evidence": "Good"},
+            {"text": "Intermittent exotropia: observe if well-controlled, surgery if decompensating", "strength": "Strong", "evidence": "Good"},
+            {"text": "Treat amblyopia before or concurrent with strabismus surgery", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Infantile esotropia: onset <6 months, large-angle (>30 PD), cross-fixation pattern",
+            "Accommodative esotropia: onset 6 months to 7 years, hyperopia ≥+2.00, improves with hyperopic correction",
+            "Intermittent exotropia: intermittent deviation, often worse at distance, closing one eye in sunlight",
+            "Measure: cover-uncover test, alternate cover + prism bar for quantification, at distance and near"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Full cycloplegic refraction (atropine 1% for children <1 year, cyclopentolate for older)"},
+            {"step": 2, "action": "Accommodative ET: prescribe full hyperopic correction, reassess in 6-8 weeks"},
+            {"step": 3, "action": "High AC/A ratio (near deviation >> distance): bifocal add or progressive lenses"},
+            {"step": 4, "action": "Non-accommodative residual (>8-10 PD with full correction): surgical correction"},
+            {"step": 5, "action": "Infantile ET: bilateral medial rectus recession (most common procedure)"},
+            {"step": 6, "action": "Intermittent XT: observe if well-controlled, surgery when decompensating or >50% of time exotropic"}
+          ],
+          "followUp": "Post-glasses: 6-8 weeks. Post-surgery: 1 day, 1 week, 1 month, then every 3-6 months. Long-term monitoring for recurrence.",
+          "boardPearls": [
+            "Full hyperopic correction is the TREATMENT for accommodative esotropia — do NOT under-correct",
+            "High AC/A ratio: near deviation exceeds distance deviation by ≥10 PD — add bifocal",
+            "Infantile esotropia: DVD (dissociated vertical deviation) and IOOA commonly associated",
+            "Bilateral medial rectus recession is the most common surgery for infantile esotropia",
+            "Cover test at distance AND near is essential — different patterns guide treatment",
+            "Sensory esotropia: large-angle ET secondary to unilateral poor vision — address underlying cause first"
+          ],
+          "pitfalls": [
+            "Under-correcting hyperopia — prescribe the FULL cycloplegic refraction for accommodative ET",
+            "Doing strabismus surgery before adequate trial of glasses",
+            "Not treating amblyopia before or concurrent with surgery",
+            "Missing a cranial nerve palsy presenting as new-onset strabismus in an adult"
+          ],
+          "quizQuestions": [
+            {"question": "What is the FIRST step in managing a child with esotropia?", "answer": "Full cycloplegic refraction to check for hyperopia", "distractors": ["Strabismus surgery referral", "Patching the deviated eye", "Botox injection to the medial rectus"]},
+            {"question": "What indicates a high AC/A ratio in esotropia?", "answer": "Near deviation exceeds distance deviation by ≥10 prism diopters", "distractors": ["Distance deviation exceeds near deviation", "Equal deviation at all distances", "No deviation at near"]}
+          ]
+        },
+        {
+          "id": "pediatric-eye-eval",
+          "title": "Pediatric Eye Evaluations",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Red reflex test at every well-baby visit — absent or asymmetric reflex requires urgent referral", "strength": "Strong", "evidence": "Good"},
+            {"text": "Vision screening at age 3-5 using age-appropriate optotypes (LEA symbols, HOTV)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Photoscreening or autorefraction-based devices acceptable for screening ages 1-5", "strength": "Strong", "evidence": "Good"},
+            {"text": "Leukocoria: ALWAYS rule out retinoblastoma — urgent ophthalmology referral", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Abnormal red reflex: absent, white (leukocoria), asymmetric — immediate referral",
+            "Failed vision screening: unable to read 20/40 at age 3-4, 20/30 at age 5+, or 2-line interocular difference",
+            "Strabismus detected: any manifest deviation or concern from parents"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Newborn: red reflex test, external exam, pupil response"},
+            {"step": 2, "action": "6 months: fix and follow, check for strabismus, red reflex"},
+            {"step": 3, "action": "3-5 years: visual acuity screening with age-appropriate optotypes"},
+            {"step": 4, "action": "Any abnormality: comprehensive ophthalmologic examination"},
+            {"step": 5, "action": "Leukocoria: urgent referral — retinoblastoma until proven otherwise"}
+          ],
+          "followUp": "Per AAP screening schedule at well-child visits. Comprehensive eye exam by age 5 for all children.",
+          "boardPearls": [
+            "Red reflex test is the single most important screening test for pediatric eye disease",
+            "Leukocoria differential: retinoblastoma, PHPV/PFV, Coats disease, cataract, ROP, toxocariasis",
+            "Retinoblastoma: NEVER biopsy intraocularly — tumor seeding risk",
+            "Fix and follow: both eyes should fixate and maintain fixation through a blink — poor fix/follow suggests amblyopia",
+            "Photoscreening can detect risk factors for amblyopia (high refractive error, anisometropia, media opacity, strabismus)"
+          ],
+          "pitfalls": [
+            "Dismissing an abnormal red reflex — ALWAYS investigate further",
+            "Not performing red reflex test at every well-baby visit",
+            "Missing unilateral poor fixation in an infant — could indicate amblyopia or serious pathology",
+            "Assuming all leukocoria is benign — retinoblastoma must be ruled out first"
+          ],
+          "quizQuestions": [
+            {"question": "What is the single most important screening test for pediatric eye disease?", "answer": "Red reflex test (Bruckner test)", "distractors": ["Cover-uncover test", "Visual acuity", "Tonometry"]},
+            {"question": "What is the most important diagnosis to rule out in a child with leukocoria?", "answer": "Retinoblastoma", "distractors": ["Cataract", "Coats disease", "PHPV/PFV"]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "refractive-optics",
+      "name": "Refractive & Optics",
+      "color": "#06b6d4",
+      "icon": "glasses",
+      "ppps": [
+        {
+          "id": "refractive-errors",
+          "title": "Refractive Errors & Presbyopia",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Cycloplegic refraction is essential in children to reveal full hyperopic error", "strength": "Strong", "evidence": "Good"},
+            {"text": "Manifest refraction should be performed with endpoint determination (least minus/most plus for best VA)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Contact lens fitting requires proper training on insertion/removal, hygiene, and follow-up schedules", "strength": "Strong", "evidence": "Good"},
+            {"text": "Progressive myopia in children: consider atropine 0.01-0.05%, multifocal contact lenses, or orthokeratology", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Myopia: distant objects blurred, near vision typically clear, minus lens correction",
+            "Hyperopia: may have clear distance vision (if accommodating), near difficulty, plus lens correction",
+            "Astigmatism: distorted/blurred vision at all distances, cylinder correction needed",
+            "Presbyopia: age-related loss of accommodation (onset ~40 years), difficulty with near tasks"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Determine refractive error: manifest refraction, cycloplegic if indicated (children, hyperopes)"},
+            {"step": 2, "action": "Prescribe appropriate correction: spectacles, contact lenses, or refractive surgery discussion"},
+            {"step": 3, "action": "Myopia control for progressive myopia in children: low-dose atropine, multifocal CLs, or orthoK"},
+            {"step": 4, "action": "Presbyopia: reading glasses, bifocals, progressive addition lenses, multifocal CLs, or monovision"},
+            {"step": 5, "action": "Contact lens wearers: annual exam with corneal evaluation, discuss risks of overnight wear"}
+          ],
+          "followUp": "Annual comprehensive eye exam. Contact lens wearers: annual with corneal evaluation. Myopia control: every 6 months.",
+          "boardPearls": [
+            "Cycloplegic refraction in children reveals latent hyperopia — always use in strabismus workup",
+            "Low-dose atropine (0.01-0.05%) reduces myopia progression by ~50% — becoming standard of care",
+            "Orthokeratology: overnight corneal reshaping lens for myopia control — effective but requires careful monitoring",
+            "Progressive myopia risk factors: younger age of onset, Asian ethnicity, two myopic parents, limited outdoor time",
+            "Contact lens complications: microbial keratitis (1 in 500/year for daily wear, 1 in 80 for extended wear)"
+          ],
+          "pitfalls": [
+            "Not doing cycloplegic refraction in children — will underprescribe hyperopic correction",
+            "Prescribing too much minus (over-minusing) — always use least minus for best VA",
+            "Not discussing myopia control options with parents of progressive myopia children",
+            "Prescribing extended-wear contact lenses without discussing increased keratitis risk"
+          ],
+          "quizQuestions": [
+            {"question": "What is the approximate risk reduction in myopia progression with low-dose atropine?", "answer": "~50% reduction in progression", "distractors": ["10% reduction", "100% (complete halt)", "No evidence of benefit"]},
+            {"question": "Why is cycloplegic refraction essential in children with esotropia?", "answer": "To reveal the full hyperopic error (latent hyperopia) which may be causing accommodative esotropia", "distractors": ["To dilate the pupil for fundus exam", "To reduce IOP", "To test for glaucoma"]}
+          ]
+        },
+        {
+          "id": "refractive-surgery",
+          "title": "Refractive Surgery (LASIK/PRK)",
+          "year": 2023,
+          "keyRecommendations": [
+            {"text": "Screen for keratoconus and forme fruste keratoconus before any corneal refractive surgery", "strength": "Strong", "evidence": "Good"},
+            {"text": "Stable refraction for at least 1 year before surgery", "strength": "Strong", "evidence": "Good"},
+            {"text": "Adequate corneal thickness: residual stromal bed ≥250 microns after LASIK", "strength": "Strong", "evidence": "Good"},
+            {"text": "Informed consent must include risks: dry eye, halos/glare, under/overcorrection, ectasia, flap complications", "strength": "Strong", "evidence": "Good"},
+            {"text": "PRK preferred over LASIK for thin corneas, anterior basement membrane dystrophy, or contact sports", "strength": "Strong", "evidence": "Moderate"}
+          ],
+          "diagnosticCriteria": [
+            "Candidate for LASIK: stable refraction, adequate corneal thickness, no keratoconus, no autoimmune disease, realistic expectations",
+            "Contraindications: keratoconus/ectasia, unstable refraction, pregnancy, autoimmune disease, severe dry eye",
+            "SMILE: small incision lenticule extraction — alternative to LASIK with smaller incision"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Screening: topography/tomography (rule out keratoconus), pachymetry, dry eye evaluation, pupil size, manifest AND cycloplegic refraction"},
+            {"step": 2, "action": "Determine procedure: LASIK (most common), PRK (thin corneas, ABMD), SMILE, or ICL (high myopia)"},
+            {"step": 3, "action": "Ensure residual stromal bed ≥250 microns (LASIK) — calculate: pachymetry - flap thickness - ablation depth"},
+            {"step": 4, "action": "Post-op: topical steroid taper + antibiotic (LASIK); longer steroid course for PRK (risk of haze)"},
+            {"step": 5, "action": "Complications: dry eye (common, usually temporary), flap complications (wrinkles, displacement), ectasia (rare but serious), haze (PRK)"}
+          ],
+          "followUp": "LASIK: 1 day, 1 week, 1 month, 3 months, 6 months, 1 year. PRK: more frequent early due to longer recovery. Dry eye management ongoing.",
+          "boardPearls": [
+            "Residual stromal bed ≥250 microns is the critical safety threshold for LASIK",
+            "Post-LASIK ectasia: the most feared complication — caused by insufficient residual stroma or undetected keratoconus",
+            "LASIK on keratoconus = ectasia — this is why screening topography is mandatory",
+            "PRK advantages over LASIK: no flap complications, can treat thinner corneas, better for contact sports",
+            "IOL calculation after refractive surgery is challenging — need adjusted K values (Barrett True-K, clinical history method)",
+            "Epithelial ingrowth after LASIK: monitor for progression, may need flap lift and debridement"
+          ],
+          "pitfalls": [
+            "Performing LASIK without topography screening for keratoconus",
+            "Not calculating residual stromal bed before LASIK",
+            "Not documenting pre-LASIK K values — needed for future IOL calculations",
+            "Performing LASIK during pregnancy (refraction unstable)",
+            "Not discussing realistic expectations and potential need for enhancement"
+          ],
+          "quizQuestions": [
+            {"question": "What is the minimum residual stromal bed thickness after LASIK?", "answer": "250 microns", "distractors": ["300 microns", "200 microns", "400 microns"]},
+            {"question": "What is the most feared complication of LASIK?", "answer": "Post-LASIK ectasia (corneal ectasia/keratectasia)", "distractors": ["Dry eye", "Halos and glare", "Undercorrection"]}
+          ]
+        },
+        {
+          "id": "cataract",
+          "title": "Cataract in the Adult Eye",
+          "year": 2025,
+          "keyRecommendations": [
+            {"text": "Surgery is indicated when cataract causes functional visual impairment affecting daily activities", "strength": "Strong", "evidence": "Good"},
+            {"text": "Phacoemulsification with posterior chamber IOL implantation is the standard of care", "strength": "Strong", "evidence": "Good"},
+            {"text": "Biometry (IOL Master or immersion A-scan) with modern formulas for IOL calculation", "strength": "Strong", "evidence": "Good"},
+            {"text": "Discuss IOL options: monofocal, toric, multifocal, extended depth of focus (EDOF)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Topical NSAID + steroid post-operatively to prevent inflammation and CME", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Decreased visual acuity attributable to lens opacity",
+            "Functional impairment: difficulty driving, reading, or performing daily activities",
+            "Types: nuclear sclerotic, cortical, posterior subcapsular (PSC)",
+            "PSC cataracts: associated with steroid use, diabetes, radiation, uveitis"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Confirm cataract as cause of visual symptoms — rule out other pathology (AMD, glaucoma, DR)"},
+            {"step": 2, "action": "Biometry: IOL Master (preferred) or immersion A-scan; use multiple formulas (Barrett Universal II, SRK/T, Haigis)"},
+            {"step": 3, "action": "Pre-op: treat ocular surface disease, manage IOP if glaucoma, optimize diabetic control"},
+            {"step": 4, "action": "Surgery: phacoemulsification + PCIOL in the capsular bag"},
+            {"step": 5, "action": "Post-op: topical steroid (prednisolone 1% taper) + NSAID (ketorolac or nepafenac) + antibiotic x 4 weeks"},
+            {"step": 6, "action": "PCO (posterior capsular opacification): Nd:YAG laser capsulotomy when visually significant"}
+          ],
+          "followUp": "1 day, 1 week, 1 month post-op. Refraction at 4-6 weeks. Final glasses prescription when refraction stable.",
+          "boardPearls": [
+            "Barrett Universal II formula is gaining favor for all axial lengths",
+            "Post-refractive surgery IOL calculation: must use adjusted K values — clinical history method, Barrett True-K, or Haigis-L",
+            "Posterior capsular rupture management: anterior vitrectomy, IOL in sulcus (reduce power 0.5-1.0 D), consider optic capture",
+            "IFIS (Intraoperative Floppy Iris Syndrome): caused by tamsulosin — use iris hooks or Malyugin ring",
+            "Toxic anterior segment syndrome (TASS): sterile inflammation 12-48 hours post-op — treat aggressively with hourly steroids",
+            "Endophthalmitis post-cataract: 1 in 1000-3000; most common organism Staph epidermidis (acute) or P. acnes (chronic)",
+            "Nd:YAG capsulotomy: wait at least 3-6 months after cataract surgery; risks include RD, CME, IOL pitting"
+          ],
+          "pitfalls": [
+            "Operating on a cataract when another condition (AMD, glaucoma) is the primary cause of vision loss",
+            "Not asking about tamsulosin (Flomax) preoperatively — IFIS risk",
+            "Using the wrong IOL formula for axial length extremes",
+            "Not documenting pre-operative K values in refractive surgery patients",
+            "Confusing TASS (early, sterile) with endophthalmitis (later, infectious)"
+          ],
+          "quizQuestions": [
+            {"question": "What medication causes IFIS (Intraoperative Floppy Iris Syndrome)?", "answer": "Tamsulosin (Flomax) — an alpha-1 blocker", "distractors": ["Metformin", "Lisinopril", "Aspirin"]},
+            {"question": "How do you adjust IOL power when placing in the sulcus instead of the bag?", "answer": "Reduce power by 0.5 to 1.0 diopter", "distractors": ["Increase power by 1.0 D", "No adjustment needed", "Reduce by 3.0 D"]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "general",
+      "name": "General & Comprehensive",
+      "color": "#64748b",
+      "icon": "clipboard",
+      "ppps": [
+        {
+          "id": "comprehensive-eye-eval",
+          "title": "Comprehensive Adult Medical Eye Evaluation",
+          "year": 2026,
+          "keyRecommendations": [
+            {"text": "Asymptomatic adults aged 40-54 with no risk factors: comprehensive exam every 2-4 years", "strength": "Strong", "evidence": "Good"},
+            {"text": "Ages 55-64: every 1-3 years", "strength": "Strong", "evidence": "Good"},
+            {"text": "Ages 65+: every 1-2 years", "strength": "Strong", "evidence": "Good"},
+            {"text": "Diabetic patients: annual dilated exam (type 2 at diagnosis, type 1 within 5 years)", "strength": "Strong", "evidence": "Good"},
+            {"text": "African Americans: increased risk of glaucoma — screening from age 40", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Complete exam includes: history, VA, pupils, EOM, confrontation fields, IOP, slit lamp, dilated fundus exam",
+            "Document: refraction, gonioscopy when indicated, optic nerve assessment"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Complete history: ocular, medical, family, medications, allergies, social history"},
+            {"step": 2, "action": "Visual acuity with correction, pupils (RAPD), IOP measurement"},
+            {"step": 3, "action": "Anterior segment examination: lids, conjunctiva, cornea, AC, iris, lens"},
+            {"step": 4, "action": "Dilated posterior segment: optic nerve, macula, vessels, peripheral retina"},
+            {"step": 5, "action": "Ancillary testing as indicated: OCT, visual fields, pachymetry, gonioscopy"},
+            {"step": 6, "action": "Assessment, plan, and appropriate follow-up interval"}
+          ],
+          "followUp": "Based on age and risk factors as per screening guidelines above.",
+          "boardPearls": [
+            "Comprehensive eye exam is the foundation of all ophthalmology — know the components",
+            "Every exam should include pupil check (RAPD), IOP, and at minimum a peripheral lens exam",
+            "Know the screening intervals by age group and risk factors — this is commonly tested",
+            "African Americans and Hispanics have higher glaucoma prevalence — earlier screening recommended"
+          ],
+          "pitfalls": [
+            "Skipping pupil exam — RAPD is the most valuable single clinical test in ophthalmology",
+            "Not dilating patients who need it — fundus pathology can be missed",
+            "Not asking about medication history — many medications affect the eyes"
+          ],
+          "quizQuestions": [
+            {"question": "How often should asymptomatic adults aged 65+ have a comprehensive eye exam?", "answer": "Every 1-2 years", "distractors": ["Every 5 years", "Only when symptomatic", "Every 6 months"]},
+            {"question": "When should type 2 diabetic patients first have a dilated eye exam?", "answer": "At the time of diabetes diagnosis", "distractors": ["5 years after diagnosis", "10 years after diagnosis", "Only if visual symptoms develop"]}
+          ]
+        },
+        {
+          "id": "hcq-screening",
+          "title": "Hydroxychloroquine Retinopathy Screening",
+          "year": 2026,
+          "keyRecommendations": [
+            {"text": "Baseline eye exam within the first year of starting hydroxychloroquine", "strength": "Strong", "evidence": "Good"},
+            {"text": "Annual screening after 5 years of use (or sooner if risk factors present)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Primary screening tests: SD-OCT and automated visual fields (10-2)", "strength": "Strong", "evidence": "Good"},
+            {"text": "Recommended dose: ≤5 mg/kg real body weight/day to minimize toxicity risk", "strength": "Strong", "evidence": "Good"},
+            {"text": "Risk factors for toxicity: dose >5 mg/kg/day, cumulative dose, renal impairment, concomitant tamoxifen use", "strength": "Strong", "evidence": "Good"}
+          ],
+          "diagnosticCriteria": [
+            "Early toxicity: parafoveal thinning on OCT, paracentral scotomas on 10-2 visual field",
+            "Advanced toxicity: bulls-eye maculopathy on fundoscopy, severely depressed visual fields",
+            "mfERG: paracentral depression (more sensitive than visual fields for early detection)"
+          ],
+          "managementAlgorithm": [
+            {"step": 1, "action": "Baseline exam: VA, dilated fundus exam, SD-OCT macula, 10-2 visual fields"},
+            {"step": 2, "action": "Low-risk patients: annual screening after 5 years of use"},
+            {"step": 3, "action": "High-risk patients (dose >5mg/kg, renal disease, >10 years of use): annual screening from the start"},
+            {"step": 4, "action": "If toxicity detected: STOP the drug immediately and refer to rheumatologist for alternative"},
+            {"step": 5, "action": "Toxicity is IRREVERSIBLE and can progress even after stopping the drug — early detection is critical"}
+          ],
+          "followUp": "Annual after 5 years of use. Immediately if any screening test is abnormal.",
+          "boardPearls": [
+            "Updated AAO guidelines (2016/2026): real body weight dosing at ≤5 mg/kg/day",
+            "SD-OCT showing parafoveal thinning is often the earliest detectable sign",
+            "Bulls-eye maculopathy is a LATE sign — by this point, damage is extensive and irreversible",
+            "Asian patients may show pericentral pattern (outside the parafoveal zone) — can be missed on 10-2 fields",
+            "Risk increases significantly after 5 years of use and with cumulative dose >1000g",
+            "Toxicity can PROGRESS even after stopping the drug — there is no treatment"
+          ],
+          "pitfalls": [
+            "Using ideal body weight instead of real body weight for dosing calculation",
+            "Not screening Asian patients with wider visual field patterns (they may have pericentral toxicity pattern)",
+            "Waiting for bulls-eye maculopathy to diagnose — this is too late",
+            "Not communicating findings to the prescribing rheumatologist promptly"
+          ],
+          "quizQuestions": [
+            {"question": "What is the maximum recommended dose of hydroxychloroquine to minimize retinal toxicity?", "answer": "≤5 mg/kg real body weight per day", "distractors": ["≤10 mg/kg/day", "400 mg/day regardless of weight", "≤2 mg/kg/day"]},
+            {"question": "What is the primary screening test for HCQ toxicity per AAO guidelines?", "answer": "SD-OCT and automated visual fields (10-2)", "distractors": ["Fundus photography only", "Amsler grid", "Color vision testing only"]}
+          ]
+        }
+      ]
+    }
+  ]
+}
