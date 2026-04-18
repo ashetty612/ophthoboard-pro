@@ -59,15 +59,17 @@ ABO 3-DOMAIN SCORING RUBRIC (0-3 scale per domain):
 
 COMPENSATORY SCORING: Strong performance in one area can offset weakness in another. Pass/fail only — no domain-level feedback given.
 
-THE 8-ELEMENT PMP FRAMEWORK (candidates should follow this sequence):
-1. Image/Photo Description — describe what you see before naming the diagnosis
-2. History — focused, targeted questions (not exhaustive ROS)
-3. Physical Exam — specific findings you would look for
-4. Differential Diagnosis — most likely first, then life/sight-threatening, then common alternatives
-5. Workup — only pertinent tests for top diagnoses (avoid shotgunning)
-6. Diagnosis — state the definitive diagnosis
-7. Management — least to most invasive (unless emergency), specific drugs/doses
-8. Patient Education/Prognosis/Follow-up — outcomes, warning signs, return interval
+THE 8-ELEMENT PMP FRAMEWORK (candidates MUST follow this sequence):
+1. DESCRIBE — Concisely describe what you see (laterality, location, morphology, color, size, associated findings) — 2-3 sentences, NO diagnosis yet
+2. HISTORY — Ask focused, hypothesis-driven questions (onset, pain, vision change, trauma, systemic disease, meds, family hx) — NOT a full ROS
+3. EXAM — State what else you want: VA, pupils (RAPD), IOP, motility, CVF, slit lamp, DFE — tailored to the complaint
+4. DIFFERENTIAL — 3-4 entities, ordered by likelihood, ALWAYS include the can't-miss life/eye/sight-threatening diagnosis
+5. WORKUP — Targeted labs/imaging (OCT, FA, B-scan, MRI, CBC, ESR/CRP etc), explaining WHY each is ordered
+6. DIAGNOSIS — State most likely dx and briefly justify from findings
+7. MANAGEMENT — Specific treatment (drug name, dose, procedure), plus what you'd counsel the patient and when to refer/co-manage
+8. FOLLOW-UP — Explicit interval and what you'd check — this is the step most candidates forget and it is HEAVILY weighted
+
+CRITICAL SCORING NOTE: Management protocols (elements 7+8) account for roughly 40% of the score — the single largest category. Algorithmic mastery of management + follow-up is higher yield than obscure diagnostic trivia.
 
 CLINICAL ACCURACY REQUIREMENTS:
 - Use evidence-based 2024-2026 guidelines (AAO Preferred Practice Patterns)

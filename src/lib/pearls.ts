@@ -562,36 +562,49 @@ export function getPearlsForCase(subspecialty: string, title: string): TeachingP
   return pearls;
 }
 
-// ABO 8-Element PMP Framework -- maps question numbers to structured answer sequence
+// ABO 8-ELEMENT PMP FRAMEWORK
+// Photo phase = Element 1 (DESCRIBE) — scored separately
+// Q1-Q6 map to Elements 2-8 (with Diagnosis implicit in Differential)
+//
+// Element 1: DESCRIBE — "Describe what you see" (photo phase, not numbered)
+// Element 2: HISTORY (Q2) — focused, hypothesis-driven questions
+// Element 3: EXAM (Q3) — VA, pupils, IOP, motility, CVF, slit lamp, DFE
+// Element 4: DIFFERENTIAL (Q1) — 3-4 entities, ordered, include can't-miss
+// Element 5: WORKUP (Q4) — targeted labs/imaging, explain why each is ordered
+// Element 6: DIAGNOSIS — implicit (examiner confirms after differential)
+// Element 7: MANAGEMENT (Q5) — drug, dose, procedure, counsel, refer
+// Element 8: FOLLOW-UP (Q6) — explicit interval + what to check (HEAVILY WEIGHTED)
+//
+// Management + Follow-up = ~40% of ABO score — highest yield area
 export const QUESTION_TYPE_INFO: { [key: number]: { name: string; description: string; tips: string } } = {
   1: {
     name: 'Differential Diagnosis',
-    description: 'List the most likely diagnoses from most to least probable.',
-    tips: 'Lead with the most likely first, then life/sight-threatening rule-outs (GCA, retinoblastoma, open globe). Include 3-5 differentials ranked by frequency. Avoid over-differentiating with rare "zebras."',
+    description: '3-4 entities, ordered by likelihood. Always include the can\'t-miss life-, eye-, or sight-threatening diagnosis.',
+    tips: 'Lead with the most likely first, then life/sight-threatening rule-outs (GCA, retinoblastoma, open globe). Include 3-5 differentials ranked by frequency. After you give your differential, the examiner will usually confirm the diagnosis and move on. Having it first shows confidence.',
   },
   2: {
-    name: 'Patient History',
-    description: 'What targeted questions would you ask to narrow your differential?',
-    tips: 'Ask FOCUSED questions, not an exhaustive ROS. Target onset, duration, pain, PMH (DM, HTN, autoimmune), medications (steroids, hydroxychloroquine), family and social history. Hypothesis-driven, not shotgunning.',
+    name: 'Focused History',
+    description: 'Ask focused, hypothesis-driven questions — NOT a full review of systems.',
+    tips: 'Target onset, duration, pain, vision change, trauma, systemic disease (DM, HTN, autoimmune), meds (steroids, HCQ, tamsulosin, anticoagulants), family history. Each question should help narrow your differential. Quality over quantity.',
   },
   3: {
-    name: 'Clinical Examination',
-    description: 'What specific exam findings are you looking for?',
-    tips: 'Always start with VA, pupils (RAPD), IOP, confrontation fields. Name specific signs: Shafer sign, Seidel test, forced duction. The examiner scores your PROCESS, not just the finding.',
+    name: 'Targeted Examination',
+    description: 'State what you want on exam — VA, pupils (RAPD), IOP, motility, CVF, slit lamp, DFE — tailored to the complaint.',
+    tips: 'Always start with: VA, pupils with swinging flashlight (RAPD), IOP, confrontation fields. Then targeted exam based on suspected diagnosis. Name specific signs: Shafer sign, Seidel test, forced duction, NVI on gonioscopy. The examiner scores your PROCESS.',
   },
   4: {
-    name: 'Diagnostic Testing',
-    description: 'What tests would confirm or rule out your leading diagnosis?',
-    tips: 'Order ONLY pertinent tests -- shotgunning loses points. Name specific tests: OCT, FFA, B-scan, CT/MRI. State what you expect each to show. Avoid invasive tests unless clearly indicated.',
+    name: 'Targeted Workup',
+    description: 'Targeted labs/imaging (OCT, FA, B-scan, MRI, CBC, ESR/CRP) — explain WHY each is ordered.',
+    tips: 'Order ONLY pertinent tests — shotgunning loses points. For each test, state what you expect to find and how it changes management. Non-invasive before invasive. Sometimes "no additional testing" IS the right answer.',
   },
   5: {
-    name: 'Treatment & Management',
-    description: 'How would you treat this condition?',
-    tips: 'Least to most invasive UNLESS emergency. Be specific: drug names, doses, frequencies, duration. Reference landmark trials (EVS, ONTT, DRCR.net). Anticipate curveballs: allergies, complications, treatment failure.',
+    name: 'Management',
+    description: 'Specific treatment: drug name + dose + route + frequency. What to counsel and when to refer/co-manage.',
+    tips: 'Management is ~30% of your score alone. Be specific: "prednisolone 1% q1h" not "steroid drops." Least to most invasive UNLESS emergency. Reference landmark trials (EVS, ONTT, DRCR.net). Anticipate curveballs: allergies, complications, treatment failure. Always mention what you\'d counsel the patient.',
   },
   6: {
-    name: 'Prognosis & Counseling',
-    description: 'What do you tell the patient about their condition?',
-    tips: 'Cover: natural history, expected outcomes, warning signs for return, lifestyle changes, follow-up intervals. Discuss informed consent for procedures. Patient counseling IS scored -- never skip it.',
+    name: 'Follow-Up',
+    description: 'Explicit follow-up interval and what you would check. This is the step most candidates forget — it is HEAVILY weighted.',
+    tips: 'State a SPECIFIC interval: "1 week" not "soon." State what you would check at follow-up. Include: return precautions (new floaters, vision loss, increasing pain), activity restrictions, driving restrictions if applicable. Follow-up accounts for ~10% of total score and is the most commonly omitted element.',
   },
 };

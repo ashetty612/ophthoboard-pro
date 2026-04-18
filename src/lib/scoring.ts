@@ -206,17 +206,23 @@ const CONCEPT_CLUSTERS: { [key: string]: string[] } = {
   'corneal_protection': ['artificial tears', 'lubricant', 'bandage contact lens', 'bcl', 'tarsorrhaphy', 'amniotic membrane', 'moisture chamber'],
 };
 
-// Question weight distribution aligned to ABO 3-Domain Rubric
-// Domain 1 (Data Acquisition): Q2 History + Q3 Exam + Q4 Tests = 33%
-// Domain 2 (Diagnosis): Q1 Differential = 33%
-// Domain 3 (Management): Q5 Treatment + Q6 Counseling = 34%
+// ABO 8-ELEMENT PMP FRAMEWORK — Scoring Weights
+// Photo phase (scored separately at 10 pts): Element 1 — DESCRIBE
+// Q1: Element 4 — DIFFERENTIAL DIAGNOSIS (includes implicit Element 6 — DIAGNOSIS)
+// Q2: Element 2 — HISTORY (focused, hypothesis-driven)
+// Q3: Element 3 — EXAM (VA, pupils, IOP, CVF, slit lamp, DFE — tailored)
+// Q4: Element 5 — WORKUP (targeted labs/imaging, justify each)
+// Q5: Element 7 — MANAGEMENT (specific treatment — ~40% of total score)
+// Q6: Element 8 — FOLLOW-UP (explicit interval + what to check — heavily weighted, often forgotten)
+//
+// Management protocols = ~40% of ABO score (elements 7+8), single largest category
 const QUESTION_WEIGHTS: { [key: number]: number } = {
-  1: 25, // Differential diagnosis — Diagnosis domain (must be prioritized, include must-not-miss)
-  2: 10, // History — Data Acquisition domain (focused, hypothesis-driven)
-  3: 12, // Exam findings — Data Acquisition domain (specific signs, not generic)
-  4: 13, // Diagnostic tests — Data Acquisition domain (pertinent only, no shotgunning)
-  5: 25, // Treatment — Management domain (specific drugs/doses, stepwise approach)
-  6: 15, // Prognosis/Counseling — Management domain (follow-up, patient education IS scored)
+  1: 20, // Differential + Diagnosis — ordered by likelihood, include can't-miss dx
+  2: 8,  // History — focused, hypothesis-driven, not a full ROS
+  3: 10, // Exam — VA, pupils (RAPD), IOP, motility, CVF, slit lamp, DFE tailored to complaint
+  4: 10, // Workup — targeted labs/imaging with justification for each
+  5: 30, // Management — drug + dose + procedure + counsel + refer/co-manage (~30% alone)
+  6: 22, // Follow-up — explicit interval + what to check (heavily weighted, most often forgotten)
 };
 
 function normalizeText(text: string): string {
