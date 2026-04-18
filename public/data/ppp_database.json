@@ -2,7 +2,7 @@
   "metadata": {
     "title": "AAO Preferred Practice Patterns - Interactive Study Guide",
     "source": "American Academy of Ophthalmology Preferred Practice Patterns",
-    "totalPPPs": 20,
+    "totalPPPs": 25,
     "generatedAt": "2026-04-18"
   },
   "subspecialties": [
@@ -148,6 +148,24 @@
                 "AGIS",
                 "CIGTS",
                 "LiGHT trial"
+              ]
+            },
+            {
+              "question": "What disc finding suggests glaucoma progression and warrants lowering target IOP?",
+              "answer": "Disc (Drance) hemorrhage — a sign of active optic nerve damage and progression",
+              "distractors": [
+                "Disc pallor",
+                "Peripapillary atrophy",
+                "Tilted disc"
+              ]
+            },
+            {
+              "question": "What are the MIGS (minimally invasive glaucoma surgery) options?",
+              "answer": "iStent/iStent inject, Hydrus microstent, Kahook dual blade goniotomy, XEN gel stent, endoscopic cyclophotocoagulation",
+              "distractors": [
+                "Only trabeculectomy and tube shunt",
+                "Only SLT and ALT",
+                "There are no minimally invasive options"
               ]
             }
           ]
@@ -475,6 +493,24 @@
                 "Complement C3 inhibitor",
                 "PDGF inhibitor"
               ]
+            },
+            {
+              "question": "What is the mechanism of geographic atrophy treatments (pegcetacoplan, avacincaptad pegol)?",
+              "answer": "Complement inhibition — pegcetacoplan inhibits C3, avacincaptad pegol inhibits C5, slowing GA progression",
+              "distractors": [
+                "VEGF inhibition",
+                "Anti-inflammatory",
+                "Neuroprotection"
+              ]
+            },
+            {
+              "question": "How do you differentiate wet AMD from polypoidal choroidal vasculopathy (PCV)?",
+              "answer": "PCV shows polypoidal lesions on ICG angiography, more common in Asian patients, may respond better to PDT + anti-VEGF combination",
+              "distractors": [
+                "They are clinically identical",
+                "PCV only occurs in children",
+                "Wet AMD always has drusen while PCV never does"
+              ]
             }
           ]
         },
@@ -589,6 +625,24 @@
                 "5 years after diagnosis",
                 "10 years after diagnosis",
                 "Only when symptoms develop"
+              ]
+            },
+            {
+              "question": "What is the significance of diabetic macular ischemia?",
+              "answer": "Enlargement of the foveal avascular zone (FAZ) on FFA/OCTA — indicates poor visual prognosis and limited response to anti-VEGF treatment",
+              "distractors": [
+                "It always resolves spontaneously",
+                "It is treated with PRP",
+                "It only occurs in type 1 diabetes"
+              ]
+            },
+            {
+              "question": "When should pregnant patients with diabetes be screened for retinopathy?",
+              "answer": "Before conception or in the first trimester, then each subsequent trimester — DR can progress rapidly during pregnancy",
+              "distractors": [
+                "Only after delivery",
+                "Once at 20 weeks",
+                "Screening is not needed during pregnancy"
               ]
             }
           ]
@@ -990,6 +1044,24 @@
                 "Risk of optic neuritis",
                 "Risk of hearing loss"
               ]
+            },
+            {
+              "question": "What newer treatment modalities exist for meibomian gland dysfunction?",
+              "answer": "Thermal pulsation (LipiFlow), intense pulsed light (IPL), meibomian gland probing, and topical azithromycin",
+              "distractors": [
+                "Only warm compresses and lid scrubs",
+                "Surgical excision of glands",
+                "Radiation therapy"
+              ]
+            },
+            {
+              "question": "How does Demodex blepharitis differ from staphylococcal blepharitis in presentation?",
+              "answer": "Demodex shows cylindrical dandruff (collarettes) at lash BASE; staphylococcal shows fibrinous scales/collarettes more distally with possible lash loss and ulceration",
+              "distractors": [
+                "They look identical",
+                "Demodex always has madarosis",
+                "Staphylococcal always has cylindrical dandruff"
+              ]
             }
           ]
         },
@@ -1088,6 +1160,24 @@
                 "Anti-dsDNA and anti-Smith",
                 "p-ANCA and c-ANCA",
                 "Anti-CCP and RF only"
+              ]
+            },
+            {
+              "question": "What is the 20-20-20 rule for digital eye strain?",
+              "answer": "Every 20 minutes, look at something 20 feet away for 20 seconds — reduces evaporative dry eye from decreased blink rate during screen use",
+              "distractors": [
+                "Blink 20 times every 20 minutes for 20 seconds",
+                "Use 20 drops of artificial tears every 20 minutes",
+                "Close eyes for 20 seconds every 20 minutes"
+              ]
+            },
+            {
+              "question": "What systemic medications commonly worsen dry eye?",
+              "answer": "Antihistamines, decongestants, antidepressants (TCAs, SSRIs), beta-blockers, diuretics, isotretinoin (Accutane), and anticholinergics",
+              "distractors": [
+                "Only antihistamines",
+                "No systemic medications affect dry eye",
+                "Only isotretinoin"
               ]
             }
           ]
@@ -1386,6 +1476,24 @@
                 "Strabismus surgery first",
                 "Immediate patching without glasses",
                 "OCT of the optic nerve"
+              ]
+            },
+            {
+              "question": "What is the PEDIG finding regarding amblyopia treatment in older children (7-17)?",
+              "answer": "Amblyopia treatment showed benefit in children up to age 17, challenging the dogma that treatment is ineffective beyond age 7-8",
+              "distractors": [
+                "Treatment is completely ineffective after age 5",
+                "Only surgical treatment works after age 8",
+                "Patching must be full-time in older children"
+              ]
+            },
+            {
+              "question": "What is the recurrence rate after stopping amblyopia treatment and how do you prevent it?",
+              "answer": "Approximately 25% recurrence rate — prevent by gradually tapering (not abruptly stopping) patching and monitoring until visual maturity (~age 10)",
+              "distractors": [
+                "0% — once treated, amblyopia never recurs",
+                "90% — treatment is rarely permanent",
+                "Recurrence only occurs with surgery"
               ]
             }
           ]
@@ -1766,6 +1874,24 @@
                 "Halos and glare",
                 "Undercorrection"
               ]
+            },
+            {
+              "question": "What is the difference between LASIK, PRK, and SMILE?",
+              "answer": "LASIK: flap creation + stromal ablation (fastest recovery). PRK: surface ablation without flap (no flap complications, more pain/slower healing). SMILE: intrastromal lenticule extraction through small incision (no flap, no surface ablation).",
+              "distractors": [
+                "They are all identical procedures",
+                "SMILE creates the largest incision",
+                "PRK is the most invasive"
+              ]
+            },
+            {
+              "question": "When is an implantable collamer lens (ICL) preferred over corneal refractive surgery?",
+              "answer": "High myopia (>-8D to -10D), thin corneas insufficient for LASIK/PRK, or when corneal refractive surgery cannot achieve the full correction",
+              "distractors": [
+                "Only for hyperopia correction",
+                "ICL is never preferred over LASIK",
+                "Only in patients over 60"
+              ]
             }
           ]
         },
@@ -1866,6 +1992,24 @@
                 "Increase power by 1.0 D",
                 "No adjustment needed",
                 "Reduce by 3.0 D"
+              ]
+            },
+            {
+              "question": "What is TASS and how does it differ from endophthalmitis?",
+              "answer": "Toxic Anterior Segment Syndrome: sterile inflammation 12-48h post-op with diffuse corneal edema, treated with intensive steroids. Differs from endophthalmitis by earlier onset, sterile culture, limbus-to-limbus edema, and steroid responsiveness",
+              "distractors": [
+                "TASS is a type of infection requiring antibiotics",
+                "They are the same condition",
+                "TASS occurs weeks after surgery"
+              ]
+            },
+            {
+              "question": "What are the risk factors for posterior capsule rupture during cataract surgery?",
+              "answer": "Pseudoexfoliation (zonular weakness), mature/white cataract, posterior polar cataract, small pupil, prior vitrectomy, axial myopia, and traumatic cataract",
+              "distractors": [
+                "Only posterior polar cataracts",
+                "Risk factors are unknown",
+                "Only occurs with femtosecond laser"
               ]
             }
           ]
@@ -2062,6 +2206,591 @@
                 "Fundus photography only",
                 "Amsler grid",
                 "Color vision testing only"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "neuro-ophthalmology",
+      "name": "Neuro-Ophthalmology",
+      "color": "#ec4899",
+      "icon": "brain",
+      "ppps": [
+        {
+          "id": "optic-neuritis",
+          "title": "Optic Neuritis & Multiple Sclerosis",
+          "year": 2026,
+          "keyRecommendations": [
+            {
+              "text": "MRI brain with contrast to evaluate for demyelinating lesions (MS plaques)",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Treat per ONTT: IV methylprednisolone 250mg q6h x 3 days, then oral prednisone taper",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "NEVER use oral steroids alone — ONTT showed increased recurrence rate",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Atypical features (bilateral, no pain, no recovery, severe disc edema) warrant expanded workup for NMO, sarcoid, syphilis",
+              "strength": "Strong",
+              "evidence": "Good"
+            }
+          ],
+          "diagnosticCriteria": [
+            "Unilateral vision loss (usually) with pain on eye movement",
+            "RAPD present in unilateral cases",
+            "Dyschromatopsia (red desaturation) often earliest finding",
+            "Visual field: central or cecocentral scotoma most common",
+            "Disc may be swollen (papillitis) or normal (retrobulbar)"
+          ],
+          "managementAlgorithm": [
+            {
+              "step": 1,
+              "action": "Confirm diagnosis: VA, RAPD, color vision, visual fields, dilated fundus exam"
+            },
+            {
+              "step": 2,
+              "action": "MRI brain and orbits with contrast and fat suppression"
+            },
+            {
+              "step": 3,
+              "action": "If typical ON: IV methylprednisolone 250mg q6h x 3 days -> oral prednisone taper x 11 days"
+            },
+            {
+              "step": 4,
+              "action": "If atypical: expanded workup — NMO-IgG/AQP4, MOG antibodies, ACE, RPR, ANA, chest X-ray"
+            },
+            {
+              "step": 5,
+              "action": "Discuss MS risk with patient: 50% with brain lesions develop MS within 15 years"
+            },
+            {
+              "step": 6,
+              "action": "Neurology referral for disease-modifying therapy if MS confirmed"
+            }
+          ],
+          "followUp": "1 month, 3 months, 6 months, 12 months. Monitor for recurrence and MS conversion. Annual MRI for patients with brain lesions.",
+          "boardPearls": [
+            "ONTT: IV steroids speed recovery but do NOT change final visual outcome",
+            "ONTT: oral prednisone alone INCREASED recurrence — this is a fatal flaw on boards",
+            "Uhthoff phenomenon: vision worsens with heat/exercise — classic for demyelinating ON",
+            "Pulfrich phenomenon: asymmetric conduction velocity causes misperception of moving objects",
+            "MRI with >=1 white matter lesion: 72% chance of MS at 15 years; no lesions: 25%",
+            "10-2 visual field most sensitive for detecting ON-related defects"
+          ],
+          "pitfalls": [
+            "Prescribing oral steroids alone for optic neuritis — FATAL FLAW per ABO",
+            "Not getting MRI in all ON patients — needed for MS risk stratification",
+            "Missing atypical features that suggest NMO instead of MS (bilateral, severe, no recovery)",
+            "Confusing optic neuritis with anterior ischemic optic neuropathy (AION)"
+          ],
+          "quizQuestions": [
+            {
+              "question": "Per the ONTT, what happens with oral prednisone alone for optic neuritis?",
+              "answer": "Increased recurrence rate of optic neuritis compared to IV steroids or placebo",
+              "distractors": [
+                "Better visual outcomes than IV steroids",
+                "Same outcomes as IV steroids",
+                "Faster recovery with no downsides"
+              ]
+            },
+            {
+              "question": "A patient with optic neuritis has 3 white matter lesions on MRI. What is her approximate risk of MS at 15 years?",
+              "answer": "72% (high risk with brain lesions)",
+              "distractors": [
+                "5%",
+                "25%",
+                "95%"
+              ]
+            },
+            {
+              "question": "What is the Uhthoff phenomenon?",
+              "answer": "Transient worsening of vision with increased body temperature (exercise, hot bath) in demyelinating optic neuritis",
+              "distractors": [
+                "Permanent vision loss after optic neuritis",
+                "Photopsias with eye movement",
+                "Color vision improvement over time"
+              ]
+            },
+            {
+              "question": "Which antibody test should be ordered for suspected NMO (neuromyelitis optica)?",
+              "answer": "NMO-IgG / Aquaporin-4 (AQP4) antibodies",
+              "distractors": [
+                "AChR antibodies",
+                "Anti-dsDNA",
+                "HLA-B27"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "iih",
+          "title": "Idiopathic Intracranial Hypertension (IIH)",
+          "year": 2025,
+          "keyRecommendations": [
+            {
+              "text": "MRI brain with MRV to rule out venous sinus thrombosis before diagnosing IIH",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Lumbar puncture with opening pressure measurement (>25 cmH2O diagnostic)",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Weight loss is the only treatment proven to achieve long-term remission",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Acetazolamide is first-line medical therapy per IIHTT trial",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Optic nerve sheath fenestration (ONSF) for acute visual loss not responding to medical therapy",
+              "strength": "Strong",
+              "evidence": "Moderate"
+            }
+          ],
+          "diagnosticCriteria": [
+            "Modified Dandy criteria: elevated opening pressure >25 cmH2O",
+            "Normal CSF composition (protein, glucose, cell count)",
+            "No mass lesion on neuroimaging",
+            "Papilledema present (bilateral usually)",
+            "Typical patient: obese woman of childbearing age with headaches"
+          ],
+          "managementAlgorithm": [
+            {
+              "step": 1,
+              "action": "MRI brain with gadolinium AND MRV (rule out venous sinus thrombosis)"
+            },
+            {
+              "step": 2,
+              "action": "Lumbar puncture: opening pressure, CSF analysis, therapeutic drainage"
+            },
+            {
+              "step": 3,
+              "action": "Start acetazolamide 500mg BID, titrate up to 1g BID as tolerated"
+            },
+            {
+              "step": 4,
+              "action": "Weight loss counseling — target 5-10% body weight loss"
+            },
+            {
+              "step": 5,
+              "action": "Monitor visual fields (24-2) and OCT RNFL every 4-6 weeks"
+            },
+            {
+              "step": 6,
+              "action": "If progressive visual loss despite max medical therapy: ONSF or CSF shunting"
+            }
+          ],
+          "followUp": "Every 4-6 weeks during active management. Visual fields and OCT at each visit. Long-term annual follow-up after stabilization.",
+          "boardPearls": [
+            "IIHTT trial: acetazolamide + weight loss superior to weight loss alone for visual field improvement",
+            "Always check MRV — venous sinus thrombosis can perfectly mimic IIH",
+            "Medications that can cause raised ICP: tetracycline, vitamin A, growth hormone, lithium",
+            "Fulminant IIH: rapidly progressive vision loss — may need urgent ONSF",
+            "Frisen grading scale for papilledema: grades 0-5 based on disc obscuration"
+          ],
+          "pitfalls": [
+            "Not checking MRV — venous sinus thrombosis is a treatable mimic",
+            "Forgetting to ask about medications that raise ICP (tetracycline, vitamin A)",
+            "Not monitoring visual fields — papilledema can cause irreversible optic atrophy",
+            "Diagnosing IIH without meeting all modified Dandy criteria"
+          ],
+          "quizQuestions": [
+            {
+              "question": "What is the opening pressure threshold for diagnosing IIH?",
+              "answer": ">25 cmH2O on lumbar puncture",
+              "distractors": [
+                ">15 cmH2O",
+                ">40 cmH2O",
+                ">10 cmH2O"
+              ]
+            },
+            {
+              "question": "What imaging must be done before diagnosing IIH?",
+              "answer": "MRI brain AND MRV (to rule out venous sinus thrombosis)",
+              "distractors": [
+                "CT head only",
+                "MRI brain only (no MRV)",
+                "Carotid Doppler"
+              ]
+            },
+            {
+              "question": "Per the IIHTT trial, what is the most effective treatment combination for IIH?",
+              "answer": "Acetazolamide + weight loss (superior to weight loss alone)",
+              "distractors": [
+                "Steroids alone",
+                "Repeated lumbar punctures",
+                "Topiramate alone"
+              ]
+            },
+            {
+              "question": "What is the surgical intervention for IIH with progressive visual loss?",
+              "answer": "Optic nerve sheath fenestration (ONSF) or CSF shunting (VP or LP shunt)",
+              "distractors": [
+                "Trabeculectomy",
+                "Vitrectomy",
+                "Craniotomy"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gca",
+          "title": "Giant Cell Arteritis (GCA)",
+          "year": 2024,
+          "keyRecommendations": [
+            {
+              "text": "Start high-dose IV methylprednisolone IMMEDIATELY on clinical suspicion — do NOT wait for biopsy",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Temporal artery biopsy within 2 weeks of starting steroids (remains diagnostic)",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "ESR + CRP + CBC (thrombocytosis) — ESR alone misses 4% of cases",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Must rule out GCA in ANY patient >50 with new headache, vision loss, jaw claudication, scalp tenderness, polymyalgia",
+              "strength": "Strong",
+              "evidence": "Good"
+            }
+          ],
+          "diagnosticCriteria": [
+            "Age >50 years",
+            "New-onset headache (temporal)",
+            "Temporal artery tenderness or decreased pulsation",
+            "Elevated ESR (often >50, sometimes >100) and/or CRP",
+            "Positive temporal artery biopsy (granulomatous inflammation)",
+            "Visual symptoms: amaurosis fugax, AION, CRAO, diplopia"
+          ],
+          "managementAlgorithm": [
+            {
+              "step": 1,
+              "action": "URGENT: Start IV methylprednisolone 1g/day x 3 days if vision affected"
+            },
+            {
+              "step": 2,
+              "action": "If no visual involvement: oral prednisone 60-80mg/day"
+            },
+            {
+              "step": 3,
+              "action": "Order ESR, CRP, CBC (look for thrombocytosis), LFTs"
+            },
+            {
+              "step": 4,
+              "action": "Temporal artery biopsy within 2 weeks — contralateral if first is negative"
+            },
+            {
+              "step": 5,
+              "action": "Slow steroid taper over 12-24 months guided by symptoms and ESR/CRP"
+            },
+            {
+              "step": 6,
+              "action": "Consider steroid-sparing agents (tocilizumab, methotrexate) for steroid side effects"
+            }
+          ],
+          "followUp": "Weekly initially during steroid taper, then every 2-4 weeks. Monitor ESR/CRP at each visit. Screen for steroid side effects (glucose, BP, bone density).",
+          "boardPearls": [
+            "Missing GCA in elderly vision loss is a FATAL FLAW on the ABO exam",
+            "Bilateral blindness can occur within hours to days without treatment",
+            "Biopsy can remain positive for 2+ weeks after starting steroids — do NOT delay treatment for biopsy",
+            "Skip lesions occur — biopsy specimen should be at least 2cm; consider bilateral biopsies",
+            "Tocilizumab (IL-6 inhibitor) is FDA-approved as steroid-sparing agent for GCA (GiACTA trial)",
+            "Jaw claudication has highest positive predictive value for GCA among clinical features"
+          ],
+          "pitfalls": [
+            "Waiting for biopsy results before starting steroids — can cause bilateral blindness",
+            "Not considering GCA in any elderly patient with vision loss, headache, or AION",
+            "Relying on ESR alone — CRP adds sensitivity; 4% have normal ESR",
+            "Tapering steroids too quickly — relapse is common"
+          ],
+          "quizQuestions": [
+            {
+              "question": "When should steroids be started for suspected GCA?",
+              "answer": "Immediately on clinical suspicion — BEFORE biopsy results are available",
+              "distractors": [
+                "After positive biopsy confirmation",
+                "After ESR results return",
+                "Only if CRP is elevated"
+              ]
+            },
+            {
+              "question": "Which clinical feature has the highest positive predictive value for GCA?",
+              "answer": "Jaw claudication",
+              "distractors": [
+                "Headache",
+                "Scalp tenderness",
+                "Elevated ESR"
+              ]
+            },
+            {
+              "question": "What steroid-sparing agent is FDA-approved for GCA?",
+              "answer": "Tocilizumab (IL-6 inhibitor, based on GiACTA trial)",
+              "distractors": [
+                "Methotrexate",
+                "Adalimumab",
+                "Rituximab"
+              ]
+            },
+            {
+              "question": "How long can temporal artery biopsy remain positive after starting steroids?",
+              "answer": "At least 2 weeks (often longer)",
+              "distractors": [
+                "24 hours",
+                "3 days",
+                "It becomes negative immediately"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "uveitis",
+      "name": "Uveitis & Inflammation",
+      "color": "#f59e0b",
+      "icon": "flame",
+      "ppps": [
+        {
+          "id": "anterior-uveitis",
+          "title": "Anterior Uveitis",
+          "year": 2024,
+          "keyRecommendations": [
+            {
+              "text": "Topical corticosteroid (prednisolone acetate 1%) is first-line for acute anterior uveitis",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Cycloplegic agent (cyclopentolate or homatropine) for pain relief and synechiae prevention",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Systemic workup for recurrent or bilateral uveitis: HLA-B27, RPR/FTA-ABS, chest X-ray, ACE level",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Granulomatous uveitis warrants broader workup (sarcoid, TB, syphilis)",
+              "strength": "Strong",
+              "evidence": "Good"
+            }
+          ],
+          "diagnosticCriteria": [
+            "Anterior chamber cells and flare on slit lamp (SUN grading: 0 to 4+)",
+            "Non-granulomatous: fine KPs, no iris nodules",
+            "Granulomatous: mutton-fat KPs, Busacca/Koeppe nodules",
+            "Symptoms: pain, redness, photophobia, tearing, blurred vision",
+            "May have posterior synechiae, band keratopathy in chronic cases"
+          ],
+          "managementAlgorithm": [
+            {
+              "step": 1,
+              "action": "Grade inflammation using SUN criteria (cells 0-4+, flare 0-4+)"
+            },
+            {
+              "step": 2,
+              "action": "Start prednisolone acetate 1%: q1h for severe, q2h for moderate, QID for mild"
+            },
+            {
+              "step": 3,
+              "action": "Add cycloplegic: homatropine 2% BID or cyclopentolate 1% TID"
+            },
+            {
+              "step": 4,
+              "action": "Taper steroids slowly — do NOT stop abruptly (rebound inflammation)"
+            },
+            {
+              "step": 5,
+              "action": "Systemic workup for first episode with granulomatous features, bilateral, recurrent, or severe"
+            },
+            {
+              "step": 6,
+              "action": "IOP monitoring — both steroid response and uveitic glaucoma"
+            }
+          ],
+          "followUp": "1 week after starting treatment, then every 1-2 weeks during taper. Check IOP at each visit. Long-term monitoring for recurrence.",
+          "boardPearls": [
+            "HLA-B27 anterior uveitis: acute, unilateral, recurrent, non-granulomatous, fibrinous, young male with back pain",
+            "Granulomatous = sarcoid, TB, syphilis, VKH. Non-granulomatous = HLA-B27, idiopathic",
+            "SUN criteria standardize grading: cells in 1x1mm slit beam at 45 degrees",
+            "Syphilis is the great mimicker — can cause ANY type of uveitis; always check RPR",
+            "Fuchs heterochromic iridocyclitis: chronic, unilateral, stellate KPs, iris heterochromia, NO synechiae",
+            "Monitor IOP — hypertensive uveitis (HSV, Posner-Schlossman) AND steroid response"
+          ],
+          "pitfalls": [
+            "Not checking IOP — both uveitic glaucoma and steroid-induced elevation are common",
+            "Stopping steroids abruptly instead of slow taper — causes rebound",
+            "Not doing syphilis testing — it can present as any form of uveitis",
+            "Misdiagnosing Fuchs heterochromic iridocyclitis as typical anterior uveitis"
+          ],
+          "quizQuestions": [
+            {
+              "question": "What is the classic presentation of HLA-B27 anterior uveitis?",
+              "answer": "Acute, unilateral, recurrent, non-granulomatous anterior uveitis in a young male with back pain (ankylosing spondylitis)",
+              "distractors": [
+                "Chronic bilateral granulomatous uveitis",
+                "Painless intermediate uveitis",
+                "Posterior uveitis with vasculitis"
+              ]
+            },
+            {
+              "question": "What differentiates granulomatous from non-granulomatous uveitis?",
+              "answer": "Granulomatous has mutton-fat KPs and iris nodules (Busacca/Koeppe); non-granulomatous has fine KPs without nodules",
+              "distractors": [
+                "Granulomatous has more pain",
+                "Non-granulomatous has posterior synechiae",
+                "There is no clinical difference"
+              ]
+            },
+            {
+              "question": "Why must syphilis testing be done in uveitis workup?",
+              "answer": "Syphilis is the great mimicker — it can present as ANY type of uveitis (anterior, intermediate, posterior, panuveitis)",
+              "distractors": [
+                "It only causes anterior uveitis",
+                "Testing is optional for first episodes",
+                "Syphilis only affects immunocompromised patients"
+              ]
+            },
+            {
+              "question": "What are the key features of Fuchs heterochromic iridocyclitis?",
+              "answer": "Chronic, unilateral, stellate KPs, iris heterochromia (lighter iris), NO posterior synechiae, mild AC reaction",
+              "distractors": [
+                "Acute bilateral uveitis with hypopyon",
+                "Severe granulomatous with dense synechiae",
+                "Intermediate uveitis with snowbanking"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "endophthalmitis",
+          "title": "Endophthalmitis",
+          "year": 2024,
+          "keyRecommendations": [
+            {
+              "text": "Treat per EVS: vitrectomy + intravitreal antibiotics if VA = light perception or worse; tap + inject if VA better than LP",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Intravitreal antibiotics: vancomycin 1mg/0.1mL + ceftazidime 2.25mg/0.1mL",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Systemic antibiotics did NOT improve outcomes in EVS",
+              "strength": "Strong",
+              "evidence": "Good"
+            },
+            {
+              "text": "Vitreous and aqueous cultures before injecting antibiotics",
+              "strength": "Strong",
+              "evidence": "Good"
+            }
+          ],
+          "diagnosticCriteria": [
+            "Post-surgical (most common): typically 2-7 days post-cataract surgery",
+            "Decreasing vision, pain, hypopyon, vitritis",
+            "Chronic/delayed (P. acnes): weeks to months post-surgery, white plaque on capsule",
+            "Endogenous: from bloodstream (liver abscess, endocarditis, IVDU)"
+          ],
+          "managementAlgorithm": [
+            {
+              "step": 1,
+              "action": "URGENT: Assess VA (LP vs better than LP — this determines management per EVS)"
+            },
+            {
+              "step": 2,
+              "action": "VA = LP or worse: PPV + vitreous biopsy + intravitreal vancomycin 1mg + ceftazidime 2.25mg"
+            },
+            {
+              "step": 3,
+              "action": "VA better than LP: vitreous tap + intravitreal vancomycin 1mg + ceftazidime 2.25mg"
+            },
+            {
+              "step": 4,
+              "action": "Consider intravitreal dexamethasone 0.4mg (controversial but commonly used)"
+            },
+            {
+              "step": 5,
+              "action": "Topical fortified antibiotics: vancomycin + ceftazidime or tobramycin q1h"
+            },
+            {
+              "step": 6,
+              "action": "Repeat tap + inject in 48-72 hours if no improvement"
+            }
+          ],
+          "followUp": "Daily for first 3-5 days. Then every 2-3 days until improving. Close monitoring for weeks.",
+          "boardPearls": [
+            "EVS is THE landmark trial for post-cataract endophthalmitis — know it cold",
+            "Most common organism: coagulase-negative Staph (S. epidermidis) for acute post-surgical",
+            "P. acnes: chronic/delayed endophthalmitis, white plaque on posterior capsule",
+            "Systemic antibiotics provided NO additional benefit in EVS",
+            "Endogenous endophthalmitis: think liver abscess (Klebsiella in East Asian patients), endocarditis, IVDU (Candida)",
+            "Post-intravitreal injection endophthalmitis rate: ~1 in 2000-5000 per injection"
+          ],
+          "pitfalls": [
+            "Confusing TASS (sterile, 12-48h post-op, responds to steroids) with endophthalmitis (infectious, 2-7 days)",
+            "Not knowing the EVS criteria — VA level determines vitrectomy vs tap+inject",
+            "Forgetting to culture before injecting antibiotics",
+            "Not considering P. acnes in chronic/delayed post-surgical endophthalmitis"
+          ],
+          "quizQuestions": [
+            {
+              "question": "Per the EVS, when is vitrectomy indicated for post-cataract endophthalmitis?",
+              "answer": "When visual acuity is light perception (LP) or worse",
+              "distractors": [
+                "For all cases of endophthalmitis",
+                "When VA is 20/200 or worse",
+                "Only when cultures are positive"
+              ]
+            },
+            {
+              "question": "What intravitreal antibiotics are used for endophthalmitis?",
+              "answer": "Vancomycin 1mg/0.1mL + Ceftazidime 2.25mg/0.1mL",
+              "distractors": [
+                "Oral ciprofloxacin + IV vancomycin",
+                "Intravitreal gentamicin only",
+                "Topical moxifloxacin only"
+              ]
+            },
+            {
+              "question": "What organism causes chronic/delayed endophthalmitis with a white capsular plaque?",
+              "answer": "Propionibacterium acnes (P. acnes / Cutibacterium acnes)",
+              "distractors": [
+                "Staphylococcus aureus",
+                "Pseudomonas aeruginosa",
+                "Streptococcus pneumoniae"
+              ]
+            },
+            {
+              "question": "How do you differentiate TASS from endophthalmitis?",
+              "answer": "TASS: onset 12-48h post-op, sterile, diffuse corneal edema, responds to steroids. Endophthalmitis: onset 2-7 days, infectious, vitritis/hypopyon, requires antibiotics.",
+              "distractors": [
+                "They are clinically identical",
+                "TASS always has hypopyon",
+                "Endophthalmitis never has corneal edema"
               ]
             }
           ]

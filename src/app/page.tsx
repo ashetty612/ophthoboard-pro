@@ -11,6 +11,7 @@ import ExamMode from "@/components/ExamMode";
 import FlashcardMode from "@/components/FlashcardMode";
 import AIExaminer from "@/components/AIExaminer";
 import PPPBrowser from "@/components/PPPBrowser";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp";
 
@@ -34,6 +35,12 @@ function EyeLogo({ size = 40 }: { size?: number }) {
       <circle cx="17.5" cy="17.5" r="1.5" fill="rgba(255,255,255,0.5)" />
     </svg>
   );
+}
+
+import type { StudyProgress } from "@/lib/types";
+
+function getDefaultProgressFn(): StudyProgress {
+  return { totalCasesAttempted: 0, totalCasesAvailable: 350, averageScore: 0, bestScore: 0, worstScore: 0, bySubspecialty: {}, recentAttempts: [], weakAreas: [], strongAreas: [] };
 }
 
 export default function Home() {
@@ -200,10 +207,16 @@ export default function Home() {
     );
   }
 
-  // Home View
-  const progress = getProgress();
-  const bookmarks = getBookmarks();
-  const streak = getStudyStreak();
+  // Home View — use state for localStorage values to avoid hydration mismatch
+  const [progress, setProgressState] = useState(getDefaultProgressFn);
+  const [bookmarks, setBookmarksState] = useState<string[]>([]);
+  const [streak, setStreakState] = useState({ current: 0, lastDate: '' });
+
+  useEffect(() => {
+    setProgressState(getProgress());
+    setBookmarksState(getBookmarks());
+    setStreakState(getStudyStreak());
+  }, [currentView]); // Re-read when view changes
   const totalActiveCases = database.subspecialties.reduce(
     (sum, s) => sum + s.cases.filter((c) => c.questions.length > 0).length,
     0

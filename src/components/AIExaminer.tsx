@@ -16,12 +16,12 @@ interface Message {
 
 type ExaminerMode = "free-chat" | "examiner" | "tutor" | "quiz";
 
-const PRIMARY_MODEL = "qwen/qwen3.6-plus:free";
-const FALLBACK_MODEL = "google/gemini-3-flash-preview";
 const API_KEY_STORAGE = "ophtho_openrouter_key";
 const BUILTIN_KEY = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || "";
+const USE_SERVER_PROXY = true; // Use server-side API route to protect API key
 
 function getStoredApiKey(): string {
+  if (USE_SERVER_PROXY) return "server-proxy";
   if (typeof window === "undefined") return BUILTIN_KEY;
   return localStorage.getItem(API_KEY_STORAGE) || BUILTIN_KEY;
 }
@@ -148,32 +148,17 @@ Be helpful, specific, and thorough.`;
   }
 }
 
-async function tryStreamModel(
-  model: string,
+async function streamViaProxy(
   messages: Message[],
-  apiKey: string,
   onChunk: (text: string) => void,
 ): Promise<boolean> {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const response = await fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-      "HTTP-Referer": typeof window !== 'undefined' ? window.location.origin : "https://ophthoboard.vercel.app",
-      "X-Title": "OphthoBoard Pro AI Examiner",
-    },
-    body: JSON.stringify({
-      model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-      stream: true,
-      temperature: 0.7,
-      max_tokens: 2000,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
   });
 
-  if (!response.ok) {
-    return false;
-  }
+  if (!response.ok) return false;
 
   const reader = response.body?.getReader();
   if (!reader) return false;
@@ -207,20 +192,83 @@ async function tryStreamModel(
   return true;
 }
 
-async function streamChat(messages: Message[], apiKey: string, onChunk: (text: string) => void, onDone: () => void): Promise<void> {
-  if (!apiKey) {
-    onChunk("Please set your OpenRouter API key first. Click 'New Session' to configure it.");
-    onDone();
-    return;
-  }
-  try {
-    const ok = await tryStreamModel(PRIMARY_MODEL, messages, apiKey, onChunk);
-    if (!ok) {
-      onChunk("_Qwen 3.6 Plus unavailable, switching to Gemini 3 Flash..._\n\n");
-      const fallbackOk = await tryStreamModel(FALLBACK_MODEL, messages, apiKey, onChunk);
-      if (!fallbackOk) {
-        onChunk("\n\n_Error: Both models failed. Please try again later._");
+async function tryStreamDirect(
+  model: string,
+  messages: Message[],
+  apiKey: string,
+  onChunk: (text: string) => void,
+): Promise<boolean> {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+      "HTTP-Referer": typeof window !== 'undefined' ? window.location.origin : "https://ophthalmology-boards.vercel.app",
+      "X-Title": "OphthoBoard Pro AI Examiner",
+    },
+    body: JSON.stringify({
+      model,
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      stream: true,
+      temperature: 0.7,
+      max_tokens: 2000,
+    }),
+  });
+
+  if (!response.ok) return false;
+
+  const reader = response.body?.getReader();
+  if (!reader) return false;
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      const data = trimmed.slice(6);
+      if (data === "[DONE]") continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) onChunk(content);
+      } catch {
+        // Skip malformed
       }
+    }
+  }
+  return true;
+}
+
+async function streamChat(messages: Message[], apiKey: string, onChunk: (text: string) => void, onDone: () => void): Promise<void> {
+  try {
+    if (USE_SERVER_PROXY) {
+      // Use server-side API route (API key hidden from client)
+      const ok = await streamViaProxy(messages, onChunk);
+      if (!ok) {
+        onChunk("\n\n_Error: AI service unavailable. Please try again later._");
+      }
+    } else if (apiKey && apiKey !== "server-proxy") {
+      // Direct call with user-provided key
+      const ok = await tryStreamDirect("qwen/qwen3.6-plus:free", messages, apiKey, onChunk);
+      if (!ok) {
+        onChunk("_Switching to backup model..._\n\n");
+        const fallbackOk = await tryStreamDirect("google/gemini-3-flash-preview", messages, apiKey, onChunk);
+        if (!fallbackOk) {
+          onChunk("\n\n_Error: Both models failed. Please try again later._");
+        }
+      }
+    } else {
+      onChunk("AI service is not configured. Please try again later.");
     }
   } catch (error) {
     onChunk(`\n\n_Error: ${error instanceof Error ? error.message : 'Failed to connect to AI. Please try again.'}_`);

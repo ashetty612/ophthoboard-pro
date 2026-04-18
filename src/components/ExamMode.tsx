@@ -40,11 +40,15 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
   }, [currentCaseIdx, currentQuestionIdx]);
 
   const [timeUp, setTimeUp] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [showTimeWarning, setShowTimeWarning] = useState(false);
 
   useEffect(() => {
-    if (phase === "active") {
+    if (phase === "active" && !isPaused) {
       timerRef.current = setInterval(() => {
         setTotalTimeRemaining((prev) => {
+          // Show warning at 30 seconds
+          if (prev === 31) setShowTimeWarning(true);
           if (prev <= 1) {
             clearInterval(timerRef.current!);
             setTimeUp(true);
@@ -57,8 +61,10 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
       return () => {
         if (timerRef.current) clearInterval(timerRef.current);
       };
+    } else if (isPaused && timerRef.current) {
+      clearInterval(timerRef.current);
     }
-  }, [phase]);
+  }, [phase, isPaused]);
 
   const toggleSpec = (specId: string) => {
     setSelectedSpecs((prev) =>
@@ -126,6 +132,14 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
   useEffect(() => {
     if (timeUp) finishExam();
   }, [timeUp, finishExam]);
+
+  // Dismiss time warning after 5 seconds
+  useEffect(() => {
+    if (showTimeWarning) {
+      const t = setTimeout(() => setShowTimeWarning(false), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [showTimeWarning]);
 
   const handleNextQuestion = () => {
     const currentCase = examCases[currentCaseIdx];
@@ -316,8 +330,15 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
                 Case {currentCaseIdx + 1}/{examCases.length}: {currentCase.title}
               </span>
               <div className="flex items-center gap-4">
-                <span className={`text-sm font-mono font-bold ${isUrgent ? "text-rose-400 animate-pulse" : "text-white"}`}>
-                  {formatTime(timeRemaining)}
+                <button
+                  onClick={() => setIsPaused(!isPaused)}
+                  className={`text-xs px-2 py-0.5 rounded ${isPaused ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'} hover:opacity-80 transition-colors`}
+                  aria-label={isPaused ? "Resume exam timer" : "Pause exam timer"}
+                >
+                  {isPaused ? "Resume" : "Pause"}
+                </button>
+                <span className={`text-sm font-mono font-bold ${isUrgent ? "text-rose-400 animate-pulse" : isPaused ? "text-amber-400" : "text-white"}`} role="timer" aria-live="polite">
+                  {isPaused ? "PAUSED" : formatTime(timeRemaining)}
                 </span>
                 <span className="text-xs text-slate-500">
                   Total: {formatTime(totalTimeRemaining)}
@@ -335,7 +356,29 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Time warning banner */}
+        {showTimeWarning && (
+          <div className="max-w-4xl mx-auto px-4 pt-4">
+            <div className="bg-rose-500/20 border border-rose-500/40 rounded-xl p-3 text-center animate-fade-in">
+              <p className="text-rose-300 text-sm font-medium">30 seconds remaining! Finish your current answer.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Pause overlay */}
+        {isPaused && (
+          <div className="max-w-4xl mx-auto px-4 pt-8">
+            <div className="glass-card rounded-2xl p-8 text-center">
+              <p className="text-2xl font-bold text-amber-400 mb-2">Exam Paused</p>
+              <p className="text-sm text-slate-400 mb-4">Take a moment. Click Resume when ready.</p>
+              <button onClick={() => setIsPaused(false)} className="px-8 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors">
+                Resume Exam
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-4xl mx-auto px-4 py-6" style={{ display: isPaused ? 'none' : undefined }}>
           {/* Image — supports both local and external URLs */}
           {(currentCase.imageFile || currentCase.externalImageUrl) && (
             <div className="mb-4 rounded-xl overflow-hidden bg-black/50 max-w-md">
