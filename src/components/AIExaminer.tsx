@@ -30,8 +30,14 @@ function setStoredApiKey(key: string) {
 }
 
 function buildSystemPrompt(mode: ExaminerMode, database: CasesDatabase, currentCase?: CaseData | null): string {
+  const imageUrl = currentCase?.imageFile
+    ? `/images/${currentCase.imageFile}`
+    : currentCase?.externalImageUrl || null;
+  const imageInstruction = imageUrl
+    ? `\nCLINICAL IMAGE URL: ${imageUrl}\nIMPORTANT: When presenting this case, provide the clinical image link in markdown format so the candidate can view it: [View Clinical Image](${imageUrl}). Present it at the start of the case before asking for the image description.`
+    : '';
   const caseContext = currentCase
-    ? `\n\nCURRENT CASE CONTEXT:\nTitle: ${currentCase.diagnosisTitle || currentCase.title}\nPresentation: ${currentCase.presentation}\nPhoto Description: ${currentCase.photoDescription}\nQuestions and Model Answers:\n${currentCase.questions.map(q => `Q${q.number}: ${q.question}\nA: ${q.answer}`).join('\n\n')}`
+    ? `\n\nCURRENT CASE CONTEXT:\nTitle: ${currentCase.diagnosisTitle || currentCase.title}\nPresentation: ${currentCase.presentation}\nPhoto Description: ${currentCase.photoDescription}${imageInstruction}\nQuestions and Model Answers:\n${currentCase.questions.map(q => `Q${q.number}: ${q.question}\nA: ${q.answer}`).join('\n\n')}`
     : '';
 
   const subspecialtySummary = database.subspecialties.map(s =>
@@ -94,7 +100,13 @@ EXAMINER BEHAVIORAL RULES:
 6. STRATEGIC PROBING: Ask "Why?" and "What specific findings?" to test depth. Don't accept vague answers.
 7. CASE COMPLETION: After each case, briefly break character to provide scored feedback using the 3-domain rubric (Data Acquisition, Diagnosis, Management) on a 0-3 scale with specific missed elements.
 
-Present cases across all 6 subspecialties. Start with a clinical vignette and image description.`;
+CLINICAL IMAGE PRESENTATION:
+- When a case has a clinical image URL, ALWAYS present it as a markdown link at the very start: "[View Clinical Image](url)"
+- Say: "Here is the clinical photograph for this case: [View Clinical Image](url). Please describe what you see."
+- If no image URL is available, describe the clinical scenario verbally and state "No clinical image available for this case."
+- For cases with images, the candidate MUST describe the image before proceeding.
+
+Present cases across all 6 subspecialties. Start with the clinical image (if available) and a brief chief complaint.`;
 
     case "tutor":
       return `${base}\n\nMODE: TEACHING TUTOR
@@ -214,6 +226,70 @@ async function streamChat(messages: Message[], apiKey: string, onChunk: (text: s
   onDone();
 }
 
+function renderMarkdownContent(text: string) {
+  // Split text into segments: markdown links, bold, italic, and plain text
+  const parts: Array<{ type: string; content: string; href?: string }> = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    // Find markdown link [text](url)
+    const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
+    // Find bold **text**
+    const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
+    // Find italic _text_
+    const italicMatch = remaining.match(/_([^_]+)_/);
+
+    // Find earliest match
+    const matches = [
+      linkMatch ? { index: remaining.indexOf(linkMatch[0]), match: linkMatch, type: 'link' } : null,
+      boldMatch ? { index: remaining.indexOf(boldMatch[0]), match: boldMatch, type: 'bold' } : null,
+      italicMatch ? { index: remaining.indexOf(italicMatch[0]), match: italicMatch, type: 'italic' } : null,
+    ].filter(Boolean).sort((a, b) => a!.index - b!.index);
+
+    if (matches.length === 0) {
+      parts.push({ type: 'text', content: remaining });
+      break;
+    }
+
+    const earliest = matches[0]!;
+    if (earliest.index > 0) {
+      parts.push({ type: 'text', content: remaining.slice(0, earliest.index) });
+    }
+
+    if (earliest.type === 'link') {
+      parts.push({ type: 'link', content: earliest.match![1], href: earliest.match![2] });
+    } else if (earliest.type === 'bold') {
+      parts.push({ type: 'bold', content: earliest.match![1] });
+    } else if (earliest.type === 'italic') {
+      parts.push({ type: 'italic', content: earliest.match![1] });
+    }
+
+    remaining = remaining.slice(earliest.index + earliest.match![0].length);
+  }
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.type === 'link') {
+          return (
+            <a key={i} href={part.href} target="_blank" rel="noopener noreferrer"
+              className="text-primary-400 hover:text-primary-300 underline font-medium">
+              {part.content}
+            </a>
+          );
+        }
+        if (part.type === 'bold') {
+          return <strong key={i} className="font-semibold text-white">{part.content}</strong>;
+        }
+        if (part.type === 'italic') {
+          return <em key={i} className="text-slate-400 italic">{part.content}</em>;
+        }
+        return <span key={i}>{part.content}</span>;
+      })}
+    </>
+  );
+}
+
 export default function AIExaminer({ database, onBack, initialCase }: AIExaminerProps) {
   const [mode, setMode] = useState<ExaminerMode>("free-chat");
   const [started, setStarted] = useState(false);
@@ -248,10 +324,19 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
 
     let greeting = "";
     switch (mode) {
-      case "examiner":
-        greeting = currentCase
-          ? `Let's begin with a case. ${currentCase.presentation}\n\nPlease describe what you would do first.`
-          : "Welcome to your oral board simulation. I'll present you with cases just like the real ABO exam. Ready to begin?";
+      case "examiner": {
+        const caseImageUrl = currentCase?.imageFile
+          ? `/images/${currentCase.imageFile}`
+          : currentCase?.externalImageUrl || null;
+        if (currentCase && caseImageUrl) {
+          greeting = `Let's begin with a case.\n\n**Clinical Image:** [View Clinical Image](${caseImageUrl})\n\n${currentCase.presentation}\n\nPlease start by describing what you see in the clinical image.`;
+        } else if (currentCase) {
+          greeting = `Let's begin with a case. ${currentCase.presentation}\n\nPlease describe what you would do first.`;
+        } else {
+          greeting = "Welcome to your oral board simulation. I'll present you with cases just like the real ABO exam. Ready to begin?";
+        }
+        break;
+      }
         break;
       case "tutor":
         greeting = "I'm your ophthalmology tutor. Ask me about any topic - from basic science to complex clinical scenarios. I'll explain thoroughly with clinical pearls and board-relevant tips. What would you like to learn about?";
@@ -476,7 +561,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
                     : "bg-slate-900/50 text-slate-200 border border-slate-800/50"
                 }`}
               >
-                <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">{msg.content}</div>
+                <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">{renderMarkdownContent(msg.content)}</div>
               </div>
             </div>
           ))}

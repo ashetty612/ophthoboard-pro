@@ -1,9 +1,19 @@
+export interface TeachingEnhancement {
+  examinerExpectations: string;
+  acceptableAnswers: string[];
+  perfectAnswer: string;
+  incorrectResponses: string[];
+  commonPitfalls: string[];
+  learningPoints: string[];
+}
+
 export interface Question {
   number: number;
   question: string;
   answer: string;
   keyPoints: string[];
   scoringKeywords: string[];
+  teaching?: TeachingEnhancement;
 }
 
 export interface CaseData {
@@ -16,8 +26,13 @@ export interface CaseData {
   presentation: string;
   imageFile: string | null;
   imageFiles: string[];
+  externalImageUrl?: string;
+  imageAttribution?: string;
   photoDescription: string;
   questions: Question[];
+  casePearls?: string[];
+  highYieldFacts?: string[];
+  relatedConditions?: string[];
 }
 
 export interface Subspecialty {
