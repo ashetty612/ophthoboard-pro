@@ -387,7 +387,6 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
         }
         break;
       }
-        break;
       case "tutor":
         greeting = "I'm your ophthalmology tutor. Ask me about any topic - from basic science to complex clinical scenarios. I'll explain thoroughly with clinical pearls and board-relevant tips. What would you like to learn about?";
         break;

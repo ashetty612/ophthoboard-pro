@@ -67,16 +67,45 @@ export default function PPPBrowser({ onBack }: PPPBrowserProps) {
   }>({ currentQ: 0, selectedAnswer: "", showResult: false, score: 0, total: 0, questions: [] });
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/data/ppp_database.json")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data: PPPDatabase) => {
+        if (cancelled) return;
+        if (!data || !Array.isArray(data.subspecialties)) {
+          throw new Error("Invalid PPP database shape");
+        }
         setDatabase(data);
         if (data.subspecialties.length > 0) {
           setActiveSubspecialty(data.subspecialties[0].id);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load PPPs:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // Shuffle answers once per question. MUST be at top of component (before any early returns)
+  // to satisfy the Rules of Hooks.
+  const currentQuizQuestion = quizState.questions[quizState.currentQ];
+  const allAnswers = useMemo(() => {
+    if (!currentQuizQuestion) return [] as string[];
+    const answers = [currentQuizQuestion.answer, ...currentQuizQuestion.distractors];
+    for (let i = answers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [answers[i], answers[j]] = [answers[j], answers[i]];
+    }
+    return answers;
+    // Reshuffle only when the question index changes (stable per-question order).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizState.currentQ, currentQuizQuestion?.question]);
 
   if (!database) {
     return (
@@ -188,16 +217,7 @@ export default function PPPBrowser({ onBack }: PPPBrowserProps) {
       );
     }
 
-    // Shuffle answers once per question (memoized to prevent re-render reshuffling)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const allAnswers = useMemo(() => {
-      const answers = [currentQuestion.answer, ...currentQuestion.distractors];
-      for (let i = answers.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [answers[i], answers[j]] = [answers[j], answers[i]];
-      }
-      return answers;
-    }, [quizState.currentQ]);
+    // allAnswers is computed at the top of the component via useMemo.
 
     return (
       <div className="min-h-screen">

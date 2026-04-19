@@ -11,7 +11,6 @@ import ExamMode from "@/components/ExamMode";
 import FlashcardMode from "@/components/FlashcardMode";
 import AIExaminer from "@/components/AIExaminer";
 import PPPBrowser from "@/components/PPPBrowser";
-import ErrorBoundary from "@/components/ErrorBoundary";
 
 type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp";
 
@@ -44,30 +43,66 @@ function getDefaultProgressFn(): StudyProgress {
 }
 
 export default function Home() {
+  // All hooks MUST be declared at the top, before any conditional returns (React Rules of Hooks).
+  // Moving any hook below an `if (...) return ...` causes React error #310.
   const [database, setDatabase] = useState<CasesDatabase | null>(null);
   const [currentView, setCurrentView] = useState<View>("home");
   const [selectedSubspecialty, setSelectedSubspecialty] = useState<Subspecialty | null>(null);
   const [selectedCase, setSelectedCase] = useState<CaseData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [cameFromHome, setCameFromHome] = useState(false);
+  const [progress, setProgressState] = useState<StudyProgress>(getDefaultProgressFn);
+  const [bookmarks, setBookmarksState] = useState<string[]>([]);
+  const [streak, setStreakState] = useState({ current: 0, lastDate: "" });
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/data/cases_database.json")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data: CasesDatabase) => {
+        if (cancelled) return;
+        // Defensive validation: shape must match expected schema
+        if (!data || !Array.isArray(data.subspecialties)) {
+          throw new Error("Invalid case database shape");
+        }
         setDatabase(data);
         setLoading(false);
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error("Failed to load cases:", err);
+        setLoadError(err?.message || "Failed to load cases");
         setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Read localStorage-backed state only on the client (avoids hydration mismatch).
+  useEffect(() => {
+    try {
+      setProgressState(getProgress());
+      setBookmarksState(getBookmarks());
+      setStreakState(getStudyStreak());
+    } catch (err) {
+      console.error("Failed to load local progress:", err);
+    }
+  }, [currentView]);
+
   const scrollToTop = useCallback(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, []);
+
+  // Silence unused-var warning while keeping bookmarks state available for future features
+  void bookmarks;
 
   const handleSelectSubspecialty = (spec: Subspecialty) => {
     setSelectedSubspecialty(spec);
@@ -130,8 +165,20 @@ export default function Home() {
 
   if (!database) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-rose-400 text-lg">Failed to load case database.</p>
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="glass-card rounded-2xl p-8 max-w-md text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <h2 className="text-xl font-bold text-white mb-2">Failed to load cases</h2>
+          <p className="text-sm text-slate-400 mb-4">
+            {loadError || "The case database could not be loaded. Check your connection and try again."}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium transition-colors"
+          >
+            Reload
+          </button>
+        </div>
       </div>
     );
   }
@@ -207,16 +254,7 @@ export default function Home() {
     );
   }
 
-  // Home View — use state for localStorage values to avoid hydration mismatch
-  const [progress, setProgressState] = useState(getDefaultProgressFn);
-  const [bookmarks, setBookmarksState] = useState<string[]>([]);
-  const [streak, setStreakState] = useState({ current: 0, lastDate: '' });
-
-  useEffect(() => {
-    setProgressState(getProgress());
-    setBookmarksState(getBookmarks());
-    setStreakState(getStudyStreak());
-  }, [currentView]); // Re-read when view changes
+  // Home View
   const totalActiveCases = database.subspecialties.reduce(
     (sum, s) => sum + s.cases.filter((c) => c.questions.length > 0).length,
     0

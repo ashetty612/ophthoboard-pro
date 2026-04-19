@@ -315,6 +315,28 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
   // ACTIVE EXAM
   if (phase === "active") {
     const currentCase = examCases[currentCaseIdx];
+    // Defensive guard: should never happen (startExam populates examCases before
+    // setting phase), but if state ever ends up inconsistent we render a recovery
+    // screen instead of crashing.
+    if (!currentCase) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6">
+          <div className="glass-card rounded-2xl p-8 max-w-md text-center">
+            <div className="text-4xl mb-3">⚠️</div>
+            <h2 className="text-xl font-bold text-white mb-2">Exam state lost</h2>
+            <p className="text-sm text-slate-400 mb-4">
+              We couldn&apos;t find the current case. Let&apos;s start over.
+            </p>
+            <button
+              onClick={() => setPhase("setup")}
+              className="px-5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium"
+            >
+              Back to Setup
+            </button>
+          </div>
+        </div>
+      );
+    }
     const isPhoto = currentQuestionIdx === -1;
     const question = !isPhoto ? currentCase.questions[currentQuestionIdx] : null;
     const questionInfo = question ? QUESTION_TYPE_INFO[question.number] : null;
