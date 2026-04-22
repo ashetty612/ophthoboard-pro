@@ -7,7 +7,7 @@ const STREAK_KEY = 'ophtho_boards_streak';
 const MAX_ATTEMPTS = 500; // Prune oldest attempts when exceeding this limit
 
 // Safe localStorage write — handles QuotaExceededError gracefully
-function safeSetItem(key: string, value: string): boolean {
+export function safeSetItem(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);
     return true;

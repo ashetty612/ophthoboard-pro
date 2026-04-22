@@ -74,6 +74,16 @@ export interface CaseAttempt {
   timeSpentSeconds: number;
 }
 
+export interface SrsCard {
+  caseId: string;
+  ease: number;
+  interval: number;
+  repetitions: number;
+  dueDate: string;
+  lastReview: string;
+  lapses: number;
+}
+
 export interface StudyProgress {
   totalCasesAttempted: number;
   totalCasesAvailable: number;

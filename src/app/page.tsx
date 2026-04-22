@@ -11,8 +11,15 @@ import ExamMode from "@/components/ExamMode";
 import FlashcardMode from "@/components/FlashcardMode";
 import AIExaminer from "@/components/AIExaminer";
 import PPPBrowser from "@/components/PPPBrowser";
+import CramSheet from "@/components/CramSheet";
+import DueTodayView from "@/components/DueTodayView";
+import RapidFireDrill from "@/components/RapidFireDrill";
+import WeaknessQuizView from "@/components/WeaknessQuizView";
+import { getDueCards, getOverdueCount } from "@/lib/srs";
+import { analyzeWeaknesses } from "@/lib/weakness-quiz";
+import { getAttempts } from "@/lib/storage";
 
-type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp";
+type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp" | "cram" | "due-today" | "rapid-fire" | "weakness-quiz";
 
 // Custom SVG eye logo
 function EyeLogo({ size = 40 }: { size?: number }) {
@@ -56,6 +63,11 @@ export default function Home() {
   const [progress, setProgressState] = useState<StudyProgress>(getDefaultProgressFn);
   const [bookmarks, setBookmarksState] = useState<string[]>([]);
   const [streak, setStreakState] = useState({ current: 0, lastDate: "" });
+  const [dueCount, setDueCount] = useState(0);
+  const [overdueCount, setOverdueCount] = useState(0);
+  const [weaknessQuizQueue, setWeaknessQuizQueue] = useState<CaseData[]>([]);
+  const [weaknessQuizIndex, setWeaknessQuizIndex] = useState(0);
+  const [weakestHint, setWeakestHint] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +102,11 @@ export default function Home() {
       setProgressState(getProgress());
       setBookmarksState(getBookmarks());
       setStreakState(getStudyStreak());
+      setDueCount(getDueCards().length);
+      setOverdueCount(getOverdueCount());
+      const prog = getProgress();
+      const report = analyzeWeaknesses(prog, getAttempts());
+      setWeakestHint(report.weakestSubspecialty);
     } catch (err) {
       console.error("Failed to load local progress:", err);
     }
@@ -120,7 +137,13 @@ export default function Home() {
 
   const handleBack = () => {
     if (currentView === "case") {
-      if (cameFromHome || !selectedSubspecialty) {
+      // If a weakness quiz is in progress, advance the queue and return to the
+      // quiz view (which shows "Case N of M" and a Start Next button).
+      if (weaknessQuizQueue.length > 0) {
+        setWeaknessQuizIndex((i) => i + 1);
+        setCurrentView("weakness-quiz");
+        setSelectedCase(null);
+      } else if (cameFromHome || !selectedSubspecialty) {
         setCurrentView("home");
         setSelectedCase(null);
         setCameFromHome(false);
@@ -134,6 +157,11 @@ export default function Home() {
     }
     scrollToTop();
   };
+
+  const resetWeaknessQuiz = useCallback(() => {
+    setWeaknessQuizQueue([]);
+    setWeaknessQuizIndex(0);
+  }, []);
 
   const filteredCases = database
     ? database.subspecialties.flatMap((s) =>
@@ -250,6 +278,54 @@ export default function Home() {
     return (
       <PPPBrowser
         onBack={() => { setCurrentView("home"); scrollToTop(); }}
+      />
+    );
+  }
+
+  if (currentView === "cram") {
+    return (
+      <CramSheet
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
+      />
+    );
+  }
+
+  if (currentView === "due-today") {
+    return (
+      <DueTodayView
+        database={database}
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
+        onStudyCase={handleSelectCase}
+      />
+    );
+  }
+
+  if (currentView === "rapid-fire") {
+    return (
+      <RapidFireDrill
+        database={database}
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
+      />
+    );
+  }
+
+  if (currentView === "weakness-quiz") {
+    return (
+      <WeaknessQuizView
+        database={database}
+        onBack={() => {
+          resetWeaknessQuiz();
+          setCurrentView("home");
+          scrollToTop();
+        }}
+        onStartCase={handleSelectCase}
+        quizQueue={weaknessQuizQueue}
+        quizIndex={weaknessQuizIndex}
+        setQuizQueue={(q) => {
+          setWeaknessQuizQueue(q);
+          setWeaknessQuizIndex(0);
+        }}
+        resetQuiz={resetWeaknessQuiz}
       />
     );
   }
@@ -474,6 +550,25 @@ export default function Home() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-14">
               {[
                 {
+                  label: "Due Today",
+                  desc: dueCount > 0
+                    ? `${dueCount} due${overdueCount > 0 ? `, ${overdueCount} overdue` : ""}`
+                    : "Nothing due — all caught up",
+                  icon: "📅",
+                  iconBg: overdueCount > 0 ? "bg-rose-500/10 text-rose-400" : "bg-primary-500/10 text-primary-400",
+                  border: overdueCount > 0 ? "border-rose-500/20" : "border-primary-500/15",
+                  action: () => setCurrentView("due-today"),
+                },
+                {
+                  label: "Weakness Drill",
+                  desc: weakestHint
+                    ? `Next recommended: ${weakestHint}`
+                    : "Target your lowest-scoring areas",
+                  icon: "🎯",
+                  iconBg: "bg-cyan-500/10 text-cyan-400", border: "border-cyan-500/15",
+                  action: () => setCurrentView("weakness-quiz"),
+                },
+                {
                   label: "Random Case", desc: "Jump into a surprise case", icon: "🎲",
                   iconBg: "bg-emerald-500/10 text-emerald-400", border: "",
                   action: () => {
@@ -497,9 +592,19 @@ export default function Home() {
                   action: () => setCurrentView("flashcards"),
                 },
                 {
+                  label: "Cram Sheet", desc: "Printable high-yield subspecialty reference", icon: "📝",
+                  iconBg: "bg-amber-500/10 text-amber-400", border: "border-amber-500/15",
+                  action: () => setCurrentView("cram"),
+                },
+                {
                   label: "AI Examiner", desc: "AI tutor, mock examiner & quiz", icon: "🤖",
                   iconBg: "bg-primary-500/10 text-primary-400", border: "border-primary-500/15",
                   action: () => setCurrentView("ai-examiner"),
+                },
+                {
+                  label: "Rapid-Fire Drill", desc: "30s per question — exam pressure simulator", icon: "⚡",
+                  iconBg: "bg-rose-500/10 text-rose-400", border: "border-rose-500/15",
+                  action: () => setCurrentView("rapid-fire"),
                 },
                 {
                   label: "Practice Patterns", desc: "AAO PPP guidelines & quizzes", icon: "📋",

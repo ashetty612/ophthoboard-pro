@@ -12,6 +12,7 @@ import {
 import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateStudyStreak } from "@/lib/storage";
 import { getPearlsForCase, QUESTION_TYPE_INFO } from "@/lib/pearls";
 import { getFatalFlawsForCase } from "@/lib/fatal-flaws";
+import { rateCase, type Rating } from "@/lib/srs";
 
 interface CaseViewerProps {
   caseData: CaseData;
@@ -40,6 +41,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   const [showTeaching, setShowTeaching] = useState(false);
   const [showPitfalls, setShowPitfalls] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [srsRated, setSrsRated] = useState<{ rating: Rating; intervalDays: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previousAttempts = getAttemptsForCase(caseData.id);
   const pearls = getPearlsForCase(caseData.subspecialty, caseData.title);
@@ -880,6 +882,38 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
             </div>
           )}
 
+          <div className="glass-card rounded-xl p-5 mb-4">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              How well did you do? (Spaced Review)
+            </p>
+            <div className="grid grid-cols-4 gap-2">
+              {([
+                { r: "again" as Rating, label: "Again", sub: "< 1 day", cls: "bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30" },
+                { r: "hard" as Rating, label: "Hard", sub: "soon", cls: "bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30" },
+                { r: "good" as Rating, label: "Good", sub: "normal", cls: "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30" },
+                { r: "easy" as Rating, label: "Easy", sub: "later", cls: "bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border-sky-500/30" },
+              ] as const).map((btn) => (
+                <button
+                  key={btn.r}
+                  disabled={srsRated !== null}
+                  onClick={() => {
+                    const updated = rateCase(caseData.id, btn.r);
+                    setSrsRated({ rating: btn.r, intervalDays: updated.interval });
+                  }}
+                  className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${btn.cls}`}
+                >
+                  <div>{btn.label}</div>
+                  <div className="text-[10px] opacity-70 mt-0.5">{btn.sub}</div>
+                </button>
+              ))}
+            </div>
+            {srsRated && (
+              <p className="text-xs text-emerald-400 mt-3 text-center">
+                Scheduled for review in {srsRated.intervalDays} day{srsRated.intervalDays === 1 ? "" : "s"}.
+              </p>
+            )}
+          </div>
+
           <div className="flex gap-4">
             <button onClick={onBack} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors">
               Back to Cases
@@ -896,6 +930,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 setShowTeaching(false);
                 setShowPitfalls(false);
                 setImageLoadError(false);
+                setSrsRated(null);
                 setStartTime(Date.now());
               }}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
