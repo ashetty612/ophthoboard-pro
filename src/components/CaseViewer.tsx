@@ -187,26 +187,29 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+          aria-label="Back to case list"
+          className="flex items-center gap-2 min-h-[44px] px-2 -ml-2 text-slate-400 hover:text-white transition-colors"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           <span className="text-sm">Back</span>
         </button>
 
-        <div className="text-center">
-          <p className="text-sm font-medium text-white">{caseData.title}</p>
-          <p className="text-xs text-slate-400">{caseData.subspecialty}</p>
+        <div className="text-center min-w-0 px-2">
+          <p className="text-sm font-medium text-white truncate">{caseData.title}</p>
+          <p className="text-xs text-slate-400 truncate">{caseData.subspecialty}</p>
         </div>
 
         <button
           onClick={handleToggleBookmark}
-          className={`p-2 rounded-lg transition-colors ${
+          aria-label={bookmarked ? "Remove bookmark" : "Bookmark this case"}
+          aria-pressed={bookmarked}
+          className={`p-2.5 min-h-[44px] min-w-[44px] rounded-lg transition-colors flex items-center justify-center ${
             bookmarked ? "text-amber-400 bg-amber-400/10" : "text-slate-400 hover:text-amber-400"
           }`}
         >
-          <svg className="w-5 h-5" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
           </svg>
         </button>

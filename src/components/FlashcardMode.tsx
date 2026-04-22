@@ -216,12 +216,12 @@ export default function FlashcardMode({ database, onBack, onPractice }: Flashcar
     <div className="min-h-screen">
       <div className="glass-card sticky top-0 z-50 border-b border-slate-700/50">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button onClick={onBack} className="text-slate-400 hover:text-white text-sm">Exit</button>
-          <span className="text-sm text-slate-400">{currentIdx + 1} / {cards.length}</span>
-          <div className="flex gap-2 text-xs">
-            <span className="text-emerald-400">{knewCount}</span>
-            <span className="text-amber-400">{partialCount}</span>
-            <span className="text-rose-400">{missedCount}</span>
+          <button onClick={onBack} aria-label="Exit flashcards" className="text-slate-400 hover:text-white text-sm px-3 py-2 min-h-[44px] -ml-3 rounded-lg">Exit</button>
+          <span className="text-sm text-slate-400" aria-label={`Card ${currentIdx + 1} of ${cards.length}`}>{currentIdx + 1} / {cards.length}</span>
+          <div className="flex gap-2 text-xs" aria-label="Score tally">
+            <span className="text-emerald-400" aria-label={`${knewCount} knew`}>{knewCount}</span>
+            <span className="text-amber-400" aria-label={`${partialCount} partial`}>{partialCount}</span>
+            <span className="text-rose-400" aria-label={`${missedCount} missed`}>{missedCount}</span>
           </div>
         </div>
         <div className="h-1 bg-slate-800">
@@ -241,7 +241,7 @@ export default function FlashcardMode({ database, onBack, onPractice }: Flashcar
                 <p className="text-sm text-slate-400 mb-4">{card.caseData.presentation}</p>
                 {card.caseData.imageFile && (
                   <div className="rounded-xl overflow-hidden bg-black/50 max-w-sm mx-auto mb-4">
-                    <img src={`/images/${card.caseData.imageFile}`} alt="" className="w-full h-auto" />
+                    <img src={`/images/${card.caseData.imageFile}`} alt={`Clinical photograph for ${card.caseData.title}`} className="w-full h-auto" />
                   </div>
                 )}
                 <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-4 mt-3">

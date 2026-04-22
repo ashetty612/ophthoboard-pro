@@ -447,10 +447,10 @@ export default function CramSheet({ onBack }: CramSheetProps) {
               {query && (
                 <button
                   onClick={() => setQuery("")}
-                  className="absolute right-2 top-2 text-slate-500 hover:text-white"
-                  aria-label="Clear"
+                  className="absolute right-0 top-0 p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white"
+                  aria-label="Clear filter"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>

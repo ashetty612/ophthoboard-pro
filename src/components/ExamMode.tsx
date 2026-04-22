@@ -13,7 +13,7 @@ interface ExamModeProps {
   onSelectCase: (caseData: CaseData) => void;
 }
 
-type ExamPhase = "setup" | "active" | "results";
+type ExamPhase = "setup" | "active" | "results" | "review";
 
 export default function ExamMode({ database, onBack }: ExamModeProps) {
   const [phase, setPhase] = useState<ExamPhase>("setup");
@@ -30,6 +30,9 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [totalTimeRemaining, setTotalTimeRemaining] = useState(0);
   const [examResults, setExamResults] = useState<CaseAttempt[]>([]);
+  const [caseTimeSpent, setCaseTimeSpent] = useState<number[]>([]); // seconds per case
+  const [questionElapsed, setQuestionElapsed] = useState(0); // seconds on current question
+  const [reviewIdx, setReviewIdx] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -42,6 +45,18 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
   const [timeUp, setTimeUp] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showTimeWarning, setShowTimeWarning] = useState(false);
+
+  // Reset per-question elapsed counter whenever the question or case changes.
+  useEffect(() => {
+    setQuestionElapsed(0);
+  }, [currentCaseIdx, currentQuestionIdx]);
+
+  // Per-question elapsed timer (tracks time on current question for budget hint)
+  useEffect(() => {
+    if (phase !== "active" || isPaused) return;
+    const t = setInterval(() => setQuestionElapsed((e) => e + 1), 1000);
+    return () => clearInterval(t);
+  }, [phase, isPaused, currentCaseIdx, currentQuestionIdx]);
 
   useEffect(() => {
     if (phase === "active" && !isPaused) {
@@ -90,13 +105,14 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
     setTotalTimeRemaining(totalExamTime);
     setAnswers({});
     setPhotoAnswers({});
+    setCaseTimeSpent(new Array(selected.length).fill(0));
     setPhase("active");
   };
 
   const finishExam = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const results: CaseAttempt[] = examCases.map((c) => {
+    const results: CaseAttempt[] = examCases.map((c, idx) => {
       const caseAnswers = answers[c.id] || new Array(c.questions.length).fill("");
       const photoAnswer = photoAnswers[c.id] || "";
       const scored = c.questions.map((q, i) => scoreAnswer(q, caseAnswers[i] || ""));
@@ -118,7 +134,7 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
         maxPossibleScore: maxPossible,
         percentageScore: pct,
         grade: calculateGrade(pct),
-        timeSpentSeconds: timePerCase * 60,
+        timeSpentSeconds: caseTimeSpent[idx] ?? timePerCase * 60,
       };
 
       saveAttempt(attempt);
@@ -127,7 +143,7 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
 
     setExamResults(results);
     setPhase("results");
-  }, [examCases, answers, photoAnswers, timePerCase]);
+  }, [examCases, answers, photoAnswers, timePerCase, caseTimeSpent]);
 
   useEffect(() => {
     if (timeUp) finishExam();
@@ -141,17 +157,46 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
     }
   }, [showTimeWarning]);
 
+  const recordCurrentCaseTimeAndAdvance = (finish: boolean) => {
+    // Record seconds used on the current case (per-case budget minus what's left).
+    const spent = Math.max(0, timePerCase * 60 - timeRemaining);
+    setCaseTimeSpent((prev) => {
+      const next = [...prev];
+      next[currentCaseIdx] = spent;
+      return next;
+    });
+    if (finish) {
+      finishExam();
+      return;
+    }
+    const nextCase = examCases[currentCaseIdx + 1];
+    setCurrentCaseIdx(currentCaseIdx + 1);
+    setCurrentQuestionIdx(nextCase.imageFile ? -1 : 0);
+    setTimeRemaining(timePerCase * 60);
+  };
+
   const handleNextQuestion = () => {
     const currentCase = examCases[currentCaseIdx];
     if (currentQuestionIdx < currentCase.questions.length - 1) {
       setCurrentQuestionIdx(currentQuestionIdx + 1);
     } else if (currentCaseIdx < examCases.length - 1) {
-      const nextCase = examCases[currentCaseIdx + 1];
-      setCurrentCaseIdx(currentCaseIdx + 1);
-      setCurrentQuestionIdx(nextCase.imageFile ? -1 : 0);
-      setTimeRemaining(timePerCase * 60);
+      recordCurrentCaseTimeAndAdvance(false);
     } else {
-      finishExam();
+      recordCurrentCaseTimeAndAdvance(true);
+    }
+  };
+
+  const skipCase = () => {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(
+        "Skip this case? Your current answers will be saved but you'll advance immediately to the next case."
+      );
+      if (!ok) return;
+    }
+    if (currentCaseIdx < examCases.length - 1) {
+      recordCurrentCaseTimeAndAdvance(false);
+    } else {
+      recordCurrentCaseTimeAndAdvance(true);
     }
   };
 
@@ -342,6 +387,36 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
     const questionInfo = question ? QUESTION_TYPE_INFO[question.number] : null;
     const isUrgent = timeRemaining < 60;
 
+    // --- Pace coach ---
+    // expected progress = fraction of cases complete based on index
+    // actual progress = fraction of total exam time elapsed
+    // paceDelta > 0 means behind (used more time than expected for progress)
+    const expectedProgress = examCases.length > 0 ? currentCaseIdx / examCases.length : 0;
+    const actualProgress = totalExamTime > 0 ? (totalExamTime - totalTimeRemaining) / totalExamTime : 0;
+    const paceDelta = (actualProgress - expectedProgress) * totalExamTime; // seconds
+    let paceLabel = "On pace";
+    let paceIcon = "✓";
+    let paceClass = "text-emerald-400";
+    if (paceDelta >= 90) {
+      paceIcon = "⚠";
+      paceLabel = "Running behind — consider skipping forward";
+      paceClass = "text-rose-400";
+    } else if (paceDelta >= 30) {
+      paceIcon = "⏱";
+      paceLabel = `${Math.round(paceDelta)}s over — speed up`;
+      paceClass = "text-amber-400";
+    } else if (paceDelta <= -30) {
+      paceIcon = "🚀";
+      paceLabel = "Ahead of pace — quality over speed";
+      paceClass = "text-primary-400";
+    }
+
+    // --- Question budget hint ---
+    // Each question gets ~1/nQuestions of the per-case budget. Flag at 2x expected.
+    const nQuestions = currentCase.questions.length + (currentCase.photoDescription ? 1 : 0);
+    const perQuestionBudget = nQuestions > 0 ? (timePerCase * 60) / nQuestions : timePerCase * 60;
+    const questionBudgetExceeded = questionElapsed > perQuestionBudget * 2;
+
     return (
       <div className="min-h-screen">
         {/* Timer header */}
@@ -354,7 +429,7 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => setIsPaused(!isPaused)}
-                  className={`text-xs px-2 py-0.5 rounded ${isPaused ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'} hover:opacity-80 transition-colors`}
+                  className={`text-xs px-3 py-2 min-h-[36px] rounded-md ${isPaused ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700 text-slate-300'} hover:opacity-80 transition-colors`}
                   aria-label={isPaused ? "Resume exam timer" : "Pause exam timer"}
                 >
                   {isPaused ? "Resume" : "Pause"}
@@ -374,6 +449,11 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
                   width: `${(timeRemaining / (timePerCase * 60)) * 100}%`,
                 }}
               />
+            </div>
+            {/* Pace coach */}
+            <div className={`mt-1.5 text-[11px] font-medium ${paceClass}`} aria-live="polite">
+              <span className="mr-1">{paceIcon}</span>
+              {paceLabel}
             </div>
           </div>
         </div>
@@ -450,6 +530,11 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
               rows={5}
               className="w-full mt-4 p-4 rounded-xl bg-slate-800/50 border border-slate-600/50 text-white placeholder-slate-500 resize-none focus:border-primary-500 transition-colors"
             />
+            {questionBudgetExceeded && (
+              <p className="mt-1.5 text-[11px] text-amber-400/90 animate-pulse">
+                ⏱ budget exceeded on this question
+              </p>
+            )}
 
             <div className="flex items-center justify-between mt-4">
               <p className="text-xs text-slate-500">
@@ -458,6 +543,13 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
                   : `Q${currentQuestionIdx + 1}/${currentCase.questions.length}`}
               </p>
               <div className="flex gap-3">
+                <button
+                  onClick={skipCase}
+                  className="px-4 py-2 rounded-xl bg-slate-700/60 hover:bg-slate-600/60 text-slate-300 text-sm font-medium transition-colors"
+                  aria-label="Skip this case and advance"
+                >
+                  Skip case
+                </button>
                 <button
                   onClick={handleNextQuestion}
                   className="px-6 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium transition-colors"
@@ -475,11 +567,164 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
     );
   }
 
+  // REVIEW MISSED CASES
+  if (phase === "review") {
+    const missed = examResults
+      .map((r, i) => ({ r, c: examCases[i] }))
+      .filter((x) => x.c && x.r.percentageScore < 70);
+
+    if (missed.length === 0) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6">
+          <div className="glass-card rounded-2xl p-8 max-w-md text-center">
+            <div className="text-4xl mb-3">🎉</div>
+            <h2 className="text-xl font-bold text-white mb-2">Nothing to review</h2>
+            <p className="text-sm text-slate-400 mb-4">
+              You scored 70% or higher on every case.
+            </p>
+            <button
+              onClick={() => setPhase("results")}
+              className="px-5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium"
+            >
+              Back to Results
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const idx = Math.min(reviewIdx, missed.length - 1);
+    const { r: result, c: reviewCase } = missed[idx];
+
+    return (
+      <div className="min-h-screen">
+        <div className="glass-card sticky top-0 z-50 border-b border-slate-700/50">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <button
+              onClick={() => setPhase("results")}
+              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-sm">Results</span>
+            </button>
+            <h1 className="text-lg font-bold text-white">
+              Review {idx + 1}/{missed.length}
+            </h1>
+            <div className="w-16" />
+          </div>
+        </div>
+
+        <div className="max-w-3xl mx-auto px-4 py-6 animate-fade-in-up">
+          <div className="glass-card rounded-2xl p-6 mb-4">
+            <p className="text-xs text-slate-400">{reviewCase.subspecialty}</p>
+            <h2 className="text-xl font-bold text-white mt-1">{reviewCase.title}</h2>
+            <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30">
+              <span className="text-xs text-rose-300">Scored {result.percentageScore}%</span>
+            </div>
+            <p className="mt-3 text-sm text-slate-300">{reviewCase.presentation}</p>
+          </div>
+
+          {reviewCase.questions.map((q, qi) => {
+            const ua = result.answers[qi];
+            return (
+              <div key={qi} className="glass-card rounded-xl p-5 mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 rounded-full bg-primary-500/20 flex items-center justify-center">
+                    <span className="text-primary-400 text-xs font-bold">{q.number}</span>
+                  </div>
+                  <p className="text-sm font-medium text-white">{q.question}</p>
+                </div>
+                {ua && (
+                  <div className="mb-3">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Your answer</p>
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap">
+                      {ua.answer || <span className="italic text-slate-500">(blank)</span>}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Score: {ua.score}/{ua.maxScore}
+                    </p>
+                  </div>
+                )}
+                <div className="mb-2">
+                  <p className="text-[11px] uppercase tracking-wide text-emerald-400 mb-1">Correct answer</p>
+                  <p className="text-sm text-slate-200 whitespace-pre-wrap">{q.answer}</p>
+                </div>
+                {q.keyPoints && q.keyPoints.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Key points</p>
+                    <ul className="list-disc list-inside text-sm text-slate-300 space-y-0.5">
+                      {q.keyPoints.map((kp, ki) => (
+                        <li key={ki}>{kp}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {q.teaching?.perfectAnswer && (
+                  <div className="mt-2 p-3 rounded-lg bg-primary-500/10 border border-primary-500/20">
+                    <p className="text-[11px] uppercase tracking-wide text-primary-300 mb-1">Perfect answer</p>
+                    <p className="text-sm text-slate-200">{q.teaching.perfectAnswer}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={() => setReviewIdx(Math.max(0, idx - 1))}
+              disabled={idx === 0}
+              className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium transition-colors"
+            >
+              Previous
+            </button>
+            {idx < missed.length - 1 ? (
+              <button
+                onClick={() => setReviewIdx(idx + 1)}
+                className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+              >
+                Next missed case
+              </button>
+            ) : (
+              <button
+                onClick={() => setPhase("results")}
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors"
+              >
+                Done reviewing
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // RESULTS
   const totalScore = examResults.reduce((s, r) => s + r.totalScore, 0);
   const totalMax = examResults.reduce((s, r) => s + r.maxPossibleScore, 0);
   const overallPct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
   const overallGrade = calculateGrade(overallPct);
+
+  // --- Pace analysis ---
+  const totalUsedSeconds = examResults.reduce((s, r) => s + (r.timeSpentSeconds || 0), 0);
+  const perCaseBudgetSec = timePerCase * 60;
+  const casesOnTime = examResults.filter((r) => r.timeSpentSeconds <= perCaseBudgetSec).length;
+  const casesOver = examResults.length - casesOnTime;
+  let slowestIdx = -1;
+  let slowestSec = -1;
+  examResults.forEach((r, i) => {
+    if (r.timeSpentSeconds > slowestSec) {
+      slowestSec = r.timeSpentSeconds;
+      slowestIdx = i;
+    }
+  });
+  const sortedByTime = [...examResults]
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => b.r.timeSpentSeconds - a.r.timeSpentSeconds);
+  const top2Sec = sortedByTime.slice(0, 2).reduce((s, x) => s + x.r.timeSpentSeconds, 0);
+  const top2Share = totalUsedSeconds > 0 ? top2Sec / totalUsedSeconds : 0;
+  const missedCount = examResults.filter((r) => r.percentageScore < 70).length;
 
   return (
     <div className="min-h-screen">
@@ -546,6 +791,78 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
           })}
         </div>
 
+        {/* Pace Analysis */}
+        <div className="glass-card rounded-2xl p-6 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xl">⏱️</span>
+            <h3 className="text-lg font-bold text-white">Pace Analysis</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <div className="bg-slate-800/40 rounded-xl p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Time used</p>
+              <p className="text-base font-semibold text-white mt-0.5">
+                {formatTime(totalUsedSeconds)}
+                <span className="text-xs font-normal text-slate-500"> / {formatTime(totalExamTime)}</span>
+              </p>
+            </div>
+            <div className="bg-slate-800/40 rounded-xl p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">On time</p>
+              <p className="text-base font-semibold text-emerald-400 mt-0.5">
+                {casesOnTime}
+                <span className="text-xs font-normal text-slate-500"> / {examResults.length} cases</span>
+              </p>
+            </div>
+            <div className="bg-slate-800/40 rounded-xl p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Over budget</p>
+              <p className={`text-base font-semibold mt-0.5 ${casesOver === 0 ? "text-slate-300" : "text-amber-400"}`}>
+                {casesOver}
+                <span className="text-xs font-normal text-slate-500"> / {examResults.length} cases</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Per-case time bars */}
+          <div className="space-y-1.5 mb-4">
+            {examResults.map((r, i) => {
+              const c = examCases[i];
+              const overBudget = r.timeSpentSeconds > perCaseBudgetSec;
+              const pct = Math.min(100, (r.timeSpentSeconds / perCaseBudgetSec) * 100);
+              return (
+                <div key={c?.id || i} className="flex items-center gap-3">
+                  <span className="text-[11px] text-slate-500 w-14 shrink-0">Case {i + 1}</span>
+                  <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${overBudget ? "bg-rose-500" : "bg-emerald-500"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className={`text-[11px] font-mono w-12 text-right ${overBudget ? "text-rose-400" : "text-slate-400"}`}>
+                    {formatTime(r.timeSpentSeconds)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Actionable feedback */}
+          <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/30">
+            {slowestIdx >= 0 && examCases[slowestIdx] && (
+              <p className="text-xs text-slate-300 mb-1">
+                <span className="text-slate-500">Most time spent:</span>{" "}
+                Case {slowestIdx + 1} ({examCases[slowestIdx].title}) —{" "}
+                <span className="font-mono">{formatTime(slowestSec)}</span>
+              </p>
+            )}
+            <p className="text-xs text-slate-400">
+              {examResults.length >= 2 && top2Share >= 0.4
+                ? `You spent ${Math.round(top2Share * 100)}% of your time on 2 cases — practice committing on tough cases.`
+                : casesOver > 0
+                ? `${casesOver} case${casesOver === 1 ? "" : "s"} ran over budget. Try setting a hard per-case cap and moving on.`
+                : "Great pacing — time was distributed evenly across cases."}
+            </p>
+          </div>
+        </div>
+
         {/* Per-case results */}
         <div className="space-y-4 mb-8">
           <h3 className="text-lg font-bold text-white">Case Breakdown</h3>
@@ -581,6 +898,17 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
           })}
         </div>
 
+        {missedCount > 0 && (
+          <button
+            onClick={() => {
+              setReviewIdx(0);
+              setPhase("review");
+            }}
+            className="w-full mb-4 py-3 rounded-xl bg-rose-600/90 hover:bg-rose-500 text-white font-medium transition-colors"
+          >
+            Review Missed Cases ({missedCount})
+          </button>
+        )}
         <div className="flex gap-4">
           <button
             onClick={onBack}

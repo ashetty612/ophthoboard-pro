@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, ReactNode } from "react";
+import { logError } from "@/lib/telemetry";
 
 interface Props {
   children: ReactNode;
@@ -27,6 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     // Log to console so the real stack (not the minified message) is available
     // in production dev tools for debugging. Also safe for telemetry later.
     console.error("ErrorBoundary caught:", error, info);
+    logError(error, { componentStack: info?.componentStack, source: "ErrorBoundary" });
     this.setState({ errorInfo: info?.componentStack || null });
   }
 

@@ -7,6 +7,9 @@ const SRS_KEY = "ophtho_boards_srs";
 const EASE_MIN = 1.3;
 const EASE_MAX = 3.0;
 const EASE_DEFAULT = 2.5;
+// Cap interval at ~10 years; beyond this is indistinguishable from "permanent"
+// and prevents Date overflow in addDaysIso() after many "easy" ratings.
+const INTERVAL_MAX_DAYS = 3650;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -68,6 +71,9 @@ export function scheduleCard(card: SrsCard | null, rating: Rating): SrsCard {
       repetitions += 1;
       break;
   }
+
+  // Defensive clamp: prevents Date overflow for many consecutive "easy" ratings.
+  interval = Math.min(Math.max(0, interval), INTERVAL_MAX_DAYS);
 
   const now = new Date();
   return {

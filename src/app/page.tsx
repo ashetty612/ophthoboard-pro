@@ -15,11 +15,14 @@ import CramSheet from "@/components/CramSheet";
 import DueTodayView from "@/components/DueTodayView";
 import RapidFireDrill from "@/components/RapidFireDrill";
 import WeaknessQuizView from "@/components/WeaknessQuizView";
+import KeyboardShortcutsOverlay from "@/components/KeyboardShortcutsOverlay";
+import DataManagement from "@/components/DataManagement";
 import { getDueCards, getOverdueCount } from "@/lib/srs";
 import { analyzeWeaknesses } from "@/lib/weakness-quiz";
 import { getAttempts } from "@/lib/storage";
+import { useGlobalKeyboard, type GlobalView } from "@/lib/use-global-keyboard";
 
-type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp" | "cram" | "due-today" | "rapid-fire" | "weakness-quiz";
+type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp" | "cram" | "due-today" | "rapid-fire" | "weakness-quiz" | "settings";
 
 // Custom SVG eye logo
 function EyeLogo({ size = 40 }: { size?: number }) {
@@ -68,6 +71,17 @@ export default function Home() {
   const [weaknessQuizQueue, setWeaknessQuizQueue] = useState<CaseData[]>([]);
   const [weaknessQuizIndex, setWeaknessQuizIndex] = useState(0);
   const [weakestHint, setWeakestHint] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+
+  useGlobalKeyboard({
+    onShowHelp: () => setShowHelp(true),
+    onNavigate: (view: GlobalView) => {
+      setCurrentView(view as View);
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -309,6 +323,14 @@ export default function Home() {
     );
   }
 
+  if (currentView === "settings") {
+    return (
+      <DataManagement
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
+      />
+    );
+  }
+
   if (currentView === "weakness-quiz") {
     return (
       <WeaknessQuizView
@@ -350,25 +372,25 @@ export default function Home() {
     <div className="min-h-screen">
       {/* Header */}
       <header className="border-b border-slate-800/80 glass-card sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
             <EyeLogo size={36} />
-            <div>
+            <div className="min-w-0">
               <h1 className="text-lg font-bold text-white tracking-tight">OphthoBoard</h1>
-              <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] hidden sm:block">Oral Boards Mastery</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] hidden sm:block">Oral Boards Mastery</p>
             </div>
           </div>
-          <nav className="flex items-center gap-1">
+          <nav aria-label="Primary" className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto">
             {[
-              { label: "Review", view: "review" as View, style: "text-slate-400 hover:text-white" },
-              { label: "Exam", view: "exam" as View, style: "text-amber-400/80 hover:text-amber-300" },
-              { label: "AI Tutor", view: "ai-examiner" as View, style: "text-primary-400/80 hover:text-primary-300" },
+              { label: "Review", view: "review" as View, style: "text-slate-300 hover:text-white" },
+              { label: "Exam", view: "exam" as View, style: "text-amber-400/90 hover:text-amber-300" },
+              { label: "AI Tutor", view: "ai-examiner" as View, style: "text-primary-400/90 hover:text-primary-300" },
               { label: "Progress", view: "dashboard" as View, style: "text-white bg-slate-800 hover:bg-slate-700" },
             ].map((item) => (
               <button
                 key={item.view}
                 onClick={() => setCurrentView(item.view)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${item.style}`}
+                className={`px-2.5 sm:px-3 py-2 min-h-[44px] rounded-lg text-[13px] sm:text-sm font-medium transition-colors whitespace-nowrap ${item.style}`}
               >
                 {item.label}
               </button>
@@ -405,9 +427,9 @@ export default function Home() {
           ].map((stat) => (
             <div key={stat.label} className="glass-card rounded-xl p-4 text-center">
               <p className={`stat-number text-2xl font-bold ${stat.color}`}>
-                {stat.value}<span className="text-sm text-slate-600">{stat.suffix}</span>
+                {stat.value}<span className="text-sm text-slate-400">{stat.suffix}</span>
               </p>
-              <p className="text-[11px] text-slate-500 mt-1 uppercase tracking-wider">{stat.label}</p>
+              <p className="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -442,8 +464,12 @@ export default function Home() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-3.5 text-slate-500 hover:text-white">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                className="absolute right-1 top-1 p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -465,11 +491,11 @@ export default function Home() {
                   className="glass-card-light rounded-lg p-3.5 text-left hover:bg-slate-700/40 transition-colors flex items-center gap-4"
                 >
                   {c.imageFile && (
-                    <img src={`/images/${c.imageFile}`} alt="" className="w-14 h-10 object-cover rounded-md opacity-80" />
+                    <img src={`/images/${c.imageFile}`} alt="" aria-hidden="true" className="w-14 h-10 object-cover rounded-md opacity-80" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white font-medium truncate">{c.title}</p>
-                    <p className="text-xs text-slate-500 truncate">{c.subspecialty}</p>
+                    <p className="text-xs text-slate-400 truncate">{c.subspecialty}</p>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-500/15 text-primary-400 shrink-0">
                     {c.questions.length} Qs
@@ -487,8 +513,8 @@ export default function Home() {
         {!searchQuery && (
           <>
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xs text-slate-500 uppercase tracking-[0.2em] font-medium">Subspecialties</h3>
-              <span className="text-xs text-slate-600">{totalActiveCases} total cases</span>
+              <h3 className="text-xs text-slate-400 uppercase tracking-[0.2em] font-medium">Subspecialties</h3>
+              <span className="text-xs text-slate-400">{totalActiveCases} total cases</span>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-14">
               {database.subspecialties.map((spec, i) => {
@@ -525,11 +551,11 @@ export default function Home() {
                       />
                     </div>
                     <div className="flex justify-between mt-1.5">
-                      <span className="text-[10px] text-slate-600">
+                      <span className="text-[11px] text-slate-400">
                         {specProgress ? specProgress.attempted : 0}/{activeCases}
                       </span>
                       {specProgress && specProgress.averageScore > 0 && (
-                        <span className={`text-[10px] font-medium ${specProgress.averageScore >= 70 ? "text-emerald-500" : "text-amber-500"}`}>
+                        <span className={`text-[11px] font-medium ${specProgress.averageScore >= 70 ? "text-emerald-400" : "text-amber-400"}`}>
                           {specProgress.averageScore}% avg
                         </span>
                       )}
@@ -616,6 +642,11 @@ export default function Home() {
                   iconBg: "bg-purple-500/10 text-purple-400", border: "",
                   action: () => setCurrentView("dashboard"),
                 },
+                {
+                  label: "Settings / Data", desc: "Export, import, or reset your progress", icon: "⚙️",
+                  iconBg: "bg-slate-500/10 text-slate-300", border: "",
+                  action: () => setCurrentView("settings"),
+                },
               ].map((item) => (
                 <button
                   key={item.label}
@@ -683,13 +714,32 @@ export default function Home() {
           <div className="divider-glow mb-6" />
           <div className="flex items-center justify-center gap-2 mb-2">
             <EyeLogo size={20} />
-            <span className="text-xs text-slate-600 font-medium tracking-wide">OphthoBoard Pro</span>
+            <span className="text-xs text-slate-400 font-medium tracking-wide">OphthoBoard Pro</span>
           </div>
-          <p className="text-[10px] text-slate-700 max-w-md mx-auto">
+          <p className="text-[11px] text-slate-500 max-w-md mx-auto">
             For educational purposes only. Not affiliated with the American Board of Ophthalmology.
+          </p>
+          <p className="text-[10px] text-slate-600 mt-2 font-mono">
+            v{process.env.NEXT_PUBLIC_BUILD_VERSION || "0.0.0"}
+            {" · "}
+            {process.env.NEXT_PUBLIC_GIT_SHA || "dev"}
+            {" · deployed "}
+            {process.env.NEXT_PUBLIC_BUILD_DATE || "—"}
           </p>
         </footer>
       </main>
+
+      {/* Floating help button (mouse users) */}
+      <button
+        onClick={() => setShowHelp(true)}
+        aria-label="Show keyboard shortcuts"
+        title="Keyboard shortcuts (?)"
+        className="fixed bottom-5 right-5 z-40 w-10 h-10 rounded-full glass-card border border-slate-700/60 flex items-center justify-center text-slate-300 opacity-50 hover:opacity-100 hover:text-white transition-opacity font-mono text-sm"
+      >
+        ?
+      </button>
+
+      <KeyboardShortcutsOverlay open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 }
