@@ -11,6 +11,7 @@ import {
 } from "@/lib/scoring";
 import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateStudyStreak } from "@/lib/storage";
 import { getPearlsForCase, QUESTION_TYPE_INFO } from "@/lib/pearls";
+import { getFatalFlawsForCase } from "@/lib/fatal-flaws";
 
 interface CaseViewerProps {
   caseData: CaseData;
@@ -42,6 +43,11 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previousAttempts = getAttemptsForCase(caseData.id);
   const pearls = getPearlsForCase(caseData.subspecialty, caseData.title);
+  const fatalFlaws = getFatalFlawsForCase(
+    caseData.diagnosisTitle || "",
+    caseData.title || "",
+    caseData.questions?.flatMap((q) => q.scoringKeywords || []) ?? []
+  );
 
   useEffect(() => {
     setBookmarked(isBookmarked(caseData.id));
@@ -705,6 +711,54 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
             {caseData.diagnosisTitle && (
               <p className="text-lg text-primary-400 font-medium mb-4">Diagnosis: {caseData.diagnosisTitle}</p>
             )}
+          </div>
+
+          {/* Fatal Flaws — what examiners specifically fail candidates for missing */}
+          {fatalFlaws.length > 0 && (
+            <div className="mb-8 space-y-3 animate-fade-in-up">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-rose-400 text-lg" aria-hidden>⚠</span>
+                <h3 className="text-sm font-bold text-rose-300 uppercase tracking-[0.18em]">
+                  Fatal Flaws — Must Not Miss
+                </h3>
+              </div>
+              {fatalFlaws.map((flaw) => (
+                <div
+                  key={flaw.id}
+                  className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-5 text-left"
+                >
+                  <p className="text-xs uppercase tracking-wider text-rose-300/80 mb-1">
+                    {flaw.subspecialty}
+                  </p>
+                  <p className="text-base font-semibold text-rose-100 mb-2">
+                    {flaw.mustNotMiss}
+                  </p>
+                  <p className="text-sm text-slate-300 mb-3">
+                    <span className="text-slate-400">Scenario: </span>
+                    {flaw.scenario}
+                  </p>
+                  <p className="text-sm text-slate-300 mb-3">
+                    <span className="text-slate-400">Why: </span>
+                    {flaw.whyCritical}
+                  </p>
+                  <div className="rounded-lg bg-slate-900/60 border border-slate-700/50 p-3 mb-3">
+                    <p className="text-[11px] text-amber-400 uppercase tracking-wider mb-1 font-semibold">
+                      Say exactly
+                    </p>
+                    <p className="text-sm text-amber-100 italic leading-relaxed">
+                      {flaw.safetyNetPhrase}
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    <span className="text-slate-300 font-semibold">Immediate action: </span>
+                    {flaw.immediateAction}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="glass-card rounded-2xl p-8 text-center mb-8">
 
             <div className="relative w-40 h-40 mx-auto mb-6">
               <svg className="w-40 h-40 score-ring" viewBox="0 0 120 120">

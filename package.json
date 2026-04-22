@@ -6,7 +6,8 @@
     "dev": "next dev",
     "lint": "next lint",
     "check:hooks": "node scripts/check-hooks-ordering.mjs",
-    "prebuild": "next lint --quiet && node scripts/check-hooks-ordering.mjs",
+    "validate:content": "node scripts/validate-content.mjs",
+    "prebuild": "next lint --quiet && node scripts/check-hooks-ordering.mjs && node scripts/validate-content.mjs",
     "build": "next build",
     "start": "next start"
   },
