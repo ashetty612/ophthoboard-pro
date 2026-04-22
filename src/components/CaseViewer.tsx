@@ -13,6 +13,7 @@ import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateSt
 import { getPearlsForCase, QUESTION_TYPE_INFO } from "@/lib/pearls";
 import { getFatalFlawsForCase } from "@/lib/fatal-flaws";
 import { rateCase, type Rating } from "@/lib/srs";
+import AudioNarrator from "@/components/AudioNarrator";
 
 interface CaseViewerProps {
   caseData: CaseData;
@@ -333,6 +334,14 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 <p className="text-sm text-slate-400">{pearls[0].pearl}</p>
               </div>
             )}
+
+            <div className="mb-6">
+              <AudioNarrator
+                title={caseData.title}
+                presentation={caseData.presentation}
+                photoDescription={caseData.photoDescription}
+              />
+            </div>
 
             <button
               onClick={handleStartCase}

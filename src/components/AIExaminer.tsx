@@ -247,11 +247,93 @@ You can help with any ophthalmology topic. Share prep tips: 8-element PMP, 3.5-m
   }
 }
 
+// --- Error -> friendly message mapping -----------------------------------
+
+function friendlyError(code: string | undefined, message: string, retryAfter?: number): string {
+  switch (code) {
+    case "auth":
+      return "AI service auth failed. Contact support.";
+    case "rate_limited":
+      return `You're sending too fast. Wait ${retryAfter ?? 30}s.`;
+    case "timeout":
+      return "Response took too long. Try a shorter question.";
+    case "model":
+      return "AI model error. Try rephrasing.";
+    case "network":
+      return "Connection lost. Your messages are saved — retry?";
+    case "bad_request":
+      return message || "Bad request.";
+    default:
+      return message || "Something went wrong. Please retry.";
+  }
+}
+
+// --- In-memory response cache for deterministic queries ------------------
+// Last 10 exact-match query->response pairs when temperature <= 0.2.
+// Per-page-load only; cleared on reload. Identical system+user messages key.
+
+const CACHE_MAX = 10;
+const CACHE_TEMP_THRESHOLD = 0.2;
+const responseCache = new Map<string, string>();
+
+function cacheKey(messages: Message[]): string {
+  return JSON.stringify(messages.map((m) => ({ r: m.role, c: m.content })));
+}
+
+function cacheGet(messages: Message[]): string | undefined {
+  const k = cacheKey(messages);
+  const hit = responseCache.get(k);
+  if (hit !== undefined) {
+    // LRU bump: re-insert so it's most-recently-used
+    responseCache.delete(k);
+    responseCache.set(k, hit);
+  }
+  return hit;
+}
+
+function cacheSet(messages: Message[], response: string): void {
+  const k = cacheKey(messages);
+  if (responseCache.has(k)) responseCache.delete(k);
+  responseCache.set(k, response);
+  while (responseCache.size > CACHE_MAX) {
+    const oldest = responseCache.keys().next().value;
+    if (oldest === undefined) break;
+    responseCache.delete(oldest);
+  }
+}
+
+interface StreamResult {
+  ok: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+  retryAfter?: number;
+}
+
 async function streamViaProxy(
   messages: Message[],
   onChunk: (text: string) => void,
-  signal?: AbortSignal
-): Promise<boolean> {
+  signal?: AbortSignal,
+  options: { temperature?: number } = {}
+): Promise<StreamResult> {
+  const { temperature } = options;
+  const cacheable = typeof temperature === "number" && temperature <= CACHE_TEMP_THRESHOLD;
+
+  // Cache hit: synthesize streaming so UX is identical to a real stream.
+  if (cacheable) {
+    const hit = cacheGet(messages);
+    if (hit !== undefined) {
+      // Chunk by ~40 chars with microtask yields; respects abort signal.
+      const size = 40;
+      for (let i = 0; i < hit.length; i += size) {
+        if (signal?.aborted) return { ok: false };
+        onChunk(hit.slice(i, i + size));
+        // Yield to the event loop so React can paint between chunks.
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      return { ok: true };
+    }
+  }
+
   let response: Response;
   try {
     response = await fetch("/api/chat", {
@@ -259,38 +341,50 @@ async function streamViaProxy(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        ...(typeof temperature === "number" ? { temperature } : {}),
       }),
       signal,
     });
   } catch (e) {
-    if ((e as Error).name === "AbortError") return false;
-    onChunk(`\n\n_Network error: ${(e as Error).message}. Please retry._`);
-    return false;
+    if ((e as Error).name === "AbortError") return { ok: false };
+    return { ok: false, errorCode: "network", errorMessage: (e as Error).message };
   }
 
   if (!response.ok) {
+    let code: string | undefined;
+    let msg = response.statusText;
+    let retryAfter: number | undefined;
     try {
       const err = await response.json();
-      onChunk(`\n\n_AI error: ${err?.error || response.statusText}_`);
+      code = err?.error?.code;
+      msg = err?.error?.message || msg;
+      retryAfter = err?.error?.retryAfter;
     } catch {
-      onChunk(`\n\n_AI error: ${response.statusText}_`);
+      // Non-JSON error body
+      code = response.status === 429 ? "rate_limited" : "network";
     }
-    return false;
+    if (response.status === 429 && retryAfter === undefined) {
+      const header = response.headers.get("Retry-After");
+      if (header) retryAfter = parseInt(header, 10) || undefined;
+    }
+    return { ok: false, errorCode: code, errorMessage: msg, retryAfter };
   }
 
   const reader = response.body?.getReader();
-  if (!reader) return false;
+  if (!reader) return { ok: false, errorCode: "network", errorMessage: "No response body." };
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let accumulated = "";
+  let mid: StreamResult | undefined;
 
   while (true) {
     let chunk;
     try {
       chunk = await reader.read();
     } catch (e) {
-      if ((e as Error).name === "AbortError") return false;
-      throw e;
+      if ((e as Error).name === "AbortError") return { ok: false };
+      return { ok: false, errorCode: "network", errorMessage: (e as Error).message };
     }
     if (chunk.done) break;
 
@@ -305,14 +399,23 @@ async function streamViaProxy(
       if (data === "[DONE]") continue;
       try {
         const parsed = JSON.parse(data);
+        if (parsed.error) {
+          mid = { ok: false, errorCode: parsed.error.code, errorMessage: parsed.error.message };
+          continue;
+        }
         const content = parsed.choices?.[0]?.delta?.content;
-        if (content) onChunk(content);
+        if (content) {
+          accumulated += content;
+          onChunk(content);
+        }
       } catch {
         // Skip malformed
       }
     }
   }
-  return true;
+  if (mid) return mid;
+  if (cacheable && accumulated) cacheSet(messages, accumulated);
+  return { ok: true };
 }
 
 function renderMarkdownContent(text: string) {
@@ -396,6 +499,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [hasContent, setHasContent] = useState(true);
   const [currentCase, setCurrentCase] = useState<CaseData | null>(initialCase || null);
   const [subspecialtyFocus, setSubspecialtyFocus] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -473,16 +577,22 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     if (["quiz", "ddx-drill"].includes(mode) || (mode === "examiner" && !currentCase)) {
       const allMsgs = [systemMsg, assistantMsg, { role: "user" as const, content: "Start." }];
       setIsStreaming(true);
+      setHasContent(false);
       abortRef.current = new AbortController();
       let accumulated = "";
       streamViaProxy(
         allMsgs,
         (chunk) => {
           accumulated += chunk;
+          if (accumulated.length > 0) setHasContent(true);
           setMessages([systemMsg, assistantMsg, { role: "assistant", content: accumulated }]);
         },
         abortRef.current.signal
-      ).finally(() => {
+      ).then((res) => {
+        if (!res.ok && res.errorCode) {
+          setError(friendlyError(res.errorCode, res.errorMessage || "", res.retryAfter));
+        }
+      }).finally(() => {
         setIsStreaming(false);
       });
     }
@@ -497,23 +607,24 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     setMessages(updatedMessages);
     setInput("");
     setIsStreaming(true);
+    setHasContent(false);
 
     let accumulated = "";
     const placeholderMsg: Message = { role: "assistant", content: "" };
     setMessages([...updatedMessages, placeholderMsg]);
 
     abortRef.current = new AbortController();
-    try {
-      await streamViaProxy(
-        updatedMessages,
-        (chunk) => {
-          accumulated += chunk;
-          setMessages([...updatedMessages, { role: "assistant", content: accumulated }]);
-        },
-        abortRef.current.signal
-      );
-    } catch (e) {
-      setError((e as Error).message);
+    const res = await streamViaProxy(
+      updatedMessages,
+      (chunk) => {
+        accumulated += chunk;
+        if (accumulated.length > 0) setHasContent(true);
+        setMessages([...updatedMessages, { role: "assistant", content: accumulated }]);
+      },
+      abortRef.current.signal
+    );
+    if (!res.ok && res.errorCode) {
+      setError(friendlyError(res.errorCode, res.errorMessage || "", res.retryAfter));
     }
     setIsStreaming(false);
   };
@@ -686,21 +797,38 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
           {messages
             .filter((m) => m.role !== "system")
-            .map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[88%] rounded-2xl px-4 py-3 ${
-                    msg.role === "user"
-                      ? "bg-primary-600 text-white"
-                      : "glass-card-light text-slate-100"
-                  }`}
-                >
-                  <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">
-                    {renderMarkdownContent(msg.content || (isStreaming && i === messages.length - 1 ? "…thinking…" : ""))}
+            .map((msg, i) => {
+              const isLast = i === messages.filter((m) => m.role !== "system").length - 1;
+              const showShimmer =
+                isStreaming && !hasContent && isLast && msg.role === "assistant" && !msg.content;
+              return (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[88%] rounded-2xl px-4 py-3 ${
+                      msg.role === "user"
+                        ? "bg-primary-600 text-white"
+                        : "glass-card-light text-slate-100"
+                    }`}
+                  >
+                    {showShimmer ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-400" aria-live="polite">
+                        <span
+                          className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse"
+                          aria-hidden
+                        />
+                        <span className="bg-gradient-to-r from-slate-400 via-white to-slate-400 bg-[length:200%_100%] bg-clip-text text-transparent animate-[shimmer_1.8s_linear_infinite]">
+                          Kimi is reasoning…
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">
+                        {renderMarkdownContent(msg.content || "")}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           {error && (
             <div className="flex justify-start">
               <div className="max-w-[88%] rounded-2xl px-4 py-3 bg-rose-500/10 border border-rose-500/40 text-rose-200 text-sm">

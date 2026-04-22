@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { CRAM_CONTENT, SUBSPECIALTY_TABS, CramSection, CramItem } from "@/lib/cram-content";
 import { FATAL_FLAWS, FatalFlaw, FatalFlawSubspecialty } from "@/lib/fatal-flaws";
+import ExportToPdfButton from "@/components/PDFExporter";
 
 interface CramSheetProps {
   onBack: () => void;
@@ -324,19 +325,23 @@ export default function CramSheet({ onBack }: CramSheetProps) {
               const acc = TAB_ACCENT[t.id] || TAB_ACCENT.general;
               const active = t.id === activeTab;
               return (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id)}
-                  className={`shrink-0 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-2 ${
-                    active
-                      ? `bg-slate-800 text-white ring-1 ${acc.ring}`
-                      : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${acc.dot}`} />
-                  <span>{t.name}</span>
-                  <span className="text-[10px] text-slate-500">{i + 1}</span>
-                </button>
+                <div key={t.id} className="shrink-0 flex items-center gap-1">
+                  <button
+                    onClick={() => setActiveTab(t.id)}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-2 ${
+                      active
+                        ? `bg-slate-800 text-white ring-1 ${acc.ring}`
+                        : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${acc.dot}`} />
+                    <span>{t.name}</span>
+                    <span className="text-[10px] text-slate-500">{i + 1}</span>
+                  </button>
+                  {active && (
+                    <ExportToPdfButton subspecialtyId={t.id} label="PDF" />
+                  )}
+                </div>
               );
             })}
           </div>

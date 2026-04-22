@@ -5,3 +5,5 @@ out
 *.log
 .vercel
 coverage
+.env*.local
+tsconfig.tsbuildinfo

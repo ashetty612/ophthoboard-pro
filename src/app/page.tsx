@@ -17,12 +17,14 @@ import RapidFireDrill from "@/components/RapidFireDrill";
 import WeaknessQuizView from "@/components/WeaknessQuizView";
 import KeyboardShortcutsOverlay from "@/components/KeyboardShortcutsOverlay";
 import DataManagement from "@/components/DataManagement";
+import UserFlashcards from "@/components/UserFlashcards";
+import QBankView from "@/components/QBankView";
 import { getDueCards, getOverdueCount } from "@/lib/srs";
 import { analyzeWeaknesses } from "@/lib/weakness-quiz";
 import { getAttempts } from "@/lib/storage";
 import { useGlobalKeyboard, type GlobalView } from "@/lib/use-global-keyboard";
 
-type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp" | "cram" | "due-today" | "rapid-fire" | "weakness-quiz" | "settings";
+type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp" | "cram" | "due-today" | "rapid-fire" | "weakness-quiz" | "settings" | "user-flashcards" | "qbank";
 
 // Custom SVG eye logo
 function EyeLogo({ size = 40 }: { size?: number }) {
@@ -72,6 +74,10 @@ export default function Home() {
   const [weaknessQuizIndex, setWeaknessQuizIndex] = useState(0);
   const [weakestHint, setWeakestHint] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  // Exam-week mode: hides low-yield modes, shows countdown. Persisted in localStorage.
+  const [examWeekMode, setExamWeekMode] = useState(false);
+  const [examDate, setExamDate] = useState<string>(""); // YYYY-MM-DD
+  const [lastCaseId, setLastCaseId] = useState<string | null>(null);
 
   useGlobalKeyboard({
     onShowHelp: () => setShowHelp(true),
@@ -119,12 +125,42 @@ export default function Home() {
       setDueCount(getDueCards().length);
       setOverdueCount(getOverdueCount());
       const prog = getProgress();
-      const report = analyzeWeaknesses(prog, getAttempts());
+      const attempts = getAttempts();
+      const report = analyzeWeaknesses(prog, attempts);
       setWeakestHint(report.weakestSubspecialty);
+      // Last-studied case from most recent attempt
+      if (attempts.length > 0) {
+        const sorted = [...attempts].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        setLastCaseId(sorted[0].caseId);
+      }
+      // Restore exam-week mode & date from localStorage
+      if (typeof window !== "undefined") {
+        setExamWeekMode(localStorage.getItem("ophthoboard.examWeekMode") === "1");
+        setExamDate(localStorage.getItem("ophthoboard.examDate") || "");
+      }
     } catch (err) {
       console.error("Failed to load local progress:", err);
     }
   }, [currentView]);
+
+  // Persist exam-week settings
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem("ophthoboard.examWeekMode", examWeekMode ? "1" : "0");
+      if (examDate) localStorage.setItem("ophthoboard.examDate", examDate);
+    } catch { /* ignore quota errors */ }
+  }, [examWeekMode, examDate]);
+
+  // Days until exam (null if no date set)
+  const daysUntilExam: number | null = (() => {
+    if (!examDate) return null;
+    const target = new Date(examDate + "T00:00:00");
+    if (isNaN(target.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  })();
 
   const scrollToTop = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -331,6 +367,22 @@ export default function Home() {
     );
   }
 
+  if (currentView === "user-flashcards") {
+    return (
+      <UserFlashcards
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
+      />
+    );
+  }
+
+  if (currentView === "qbank") {
+    return (
+      <QBankView
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
+      />
+    );
+  }
+
   if (currentView === "weakness-quiz") {
     return (
       <WeaknessQuizView
@@ -368,6 +420,22 @@ export default function Home() {
 
   const completionPct = totalActiveCases > 0 ? Math.round((progress.totalCasesAttempted / totalActiveCases) * 100) : 0;
 
+  // Find the last-studied case object (if still present in database)
+  const lastCase = lastCaseId
+    ? database.subspecialties.flatMap((s) => s.cases).find((c) => c.id === lastCaseId) || null
+    : null;
+
+  // Actionable recommended case from weakest subspecialty
+  const weakestCase = (() => {
+    if (!weakestHint) return null;
+    const spec = database.subspecialties.find((s) => s.name === weakestHint);
+    if (!spec) return null;
+    const eligible = spec.cases.filter((c) => c.questions.length > 0);
+    return eligible[Math.floor(Math.random() * eligible.length)] || null;
+  })();
+
+  const isFirstTime = progress.totalCasesAttempted === 0;
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -400,6 +468,127 @@ export default function Home() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10">
+        {/* Exam-Week Mode Banner */}
+        {examWeekMode && (
+          <div className="mb-6 rounded-xl border border-rose-500/40 bg-gradient-to-r from-rose-500/15 to-amber-500/10 p-4 animate-fade-in-up" role="status">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl" aria-hidden>🔥</span>
+                <div>
+                  <p className="text-sm font-bold text-rose-200 uppercase tracking-wider">Exam-Week Mode Active</p>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {daysUntilExam === null
+                      ? "Set your exam date below to show a countdown."
+                      : daysUntilExam > 0
+                      ? `${daysUntilExam} day${daysUntilExam === 1 ? "" : "s"} until exam — focused on high-yield modes only.`
+                      : daysUntilExam === 0
+                      ? "Exam is TODAY. Deep breath — you've prepared. Go crush it."
+                      : "Exam date has passed — turn off Exam-Week Mode in Settings when ready."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={examDate}
+                  onChange={(e) => setExamDate(e.target.value)}
+                  aria-label="Exam date"
+                  className="px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700/60 text-xs text-slate-200"
+                />
+                <button
+                  onClick={() => setExamWeekMode(false)}
+                  className="px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-xs text-slate-300"
+                >
+                  Exit
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* First-Time User Getting-Started Card */}
+        {isFirstTime && !examWeekMode && (
+          <div className="mb-8 rounded-2xl border border-primary-500/30 bg-gradient-to-br from-primary-500/10 to-violet-500/10 p-6 animate-fade-in-up">
+            <p className="text-[11px] text-primary-300 uppercase tracking-[0.2em] font-semibold mb-2">New here? Start in 30 seconds</p>
+            <h3 className="text-lg font-bold text-white mb-3">Pick a workflow below to see how this works.</h3>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  const all = database.subspecialties.flatMap((s) => s.cases.filter((c) => c.questions.length > 0));
+                  handleSelectCase(all[Math.floor(Math.random() * all.length)]);
+                }}
+                className="text-left rounded-xl p-3 bg-slate-900/60 border border-slate-700/50 hover:border-primary-500/50 transition-colors"
+              >
+                <p className="text-sm font-semibold text-white mb-0.5">1. Try a random case</p>
+                <p className="text-xs text-slate-400">6 questions, ABO-style scoring, ~5 min</p>
+              </button>
+              <button
+                onClick={() => setCurrentView("ai-examiner")}
+                className="text-left rounded-xl p-3 bg-slate-900/60 border border-slate-700/50 hover:border-primary-500/50 transition-colors"
+              >
+                <p className="text-sm font-semibold text-white mb-0.5">2. Meet the AI Examiner</p>
+                <p className="text-xs text-slate-400">Simulates real oral-exam pressure</p>
+              </button>
+              <button
+                onClick={() => setCurrentView("cram")}
+                className="text-left rounded-xl p-3 bg-slate-900/60 border border-slate-700/50 hover:border-primary-500/50 transition-colors"
+              >
+                <p className="text-sm font-semibold text-white mb-0.5">3. Skim the Cram Sheet</p>
+                <p className="text-xs text-slate-400">High-yield facts across all subspecialties</p>
+              </button>
+              <button
+                onClick={() => setShowHelp(true)}
+                className="text-left rounded-xl p-3 bg-slate-900/60 border border-slate-700/50 hover:border-primary-500/50 transition-colors"
+              >
+                <p className="text-sm font-semibold text-white mb-0.5">4. See keyboard shortcuts</p>
+                <p className="text-xs text-slate-400">Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 font-mono text-[10px]">?</kbd> anytime</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Quick-Study Shortcut Bar (returning users) */}
+        {!isFirstTime && (
+          <div className="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-2 animate-fade-in-up">
+            <button
+              onClick={() => lastCase && handleSelectCase(lastCase)}
+              disabled={!lastCase}
+              className="rounded-xl p-3 bg-slate-900/60 border border-slate-700/50 hover:border-primary-500/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
+              aria-label="Continue last case"
+            >
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Continue</p>
+              <p className="text-xs text-white font-medium truncate mt-0.5">{lastCase ? lastCase.title : "No recent case"}</p>
+            </button>
+            <button
+              onClick={() => setCurrentView("due-today")}
+              className={`rounded-xl p-3 border transition-colors text-left ${dueCount > 0 ? "bg-primary-500/10 border-primary-500/40 hover:border-primary-400" : "bg-slate-900/60 border-slate-700/50"}`}
+              aria-label="Study cards due today"
+            >
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Due today</p>
+              <p className="text-xs text-white font-medium mt-0.5">
+                {dueCount > 0 ? `${dueCount} card${dueCount === 1 ? "" : "s"}${overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}` : "All caught up"}
+              </p>
+            </button>
+            <button
+              onClick={() => weakestCase && handleSelectCase(weakestCase)}
+              disabled={!weakestCase}
+              className="rounded-xl p-3 bg-slate-900/60 border border-slate-700/50 hover:border-rose-500/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
+              aria-label="Study a case from your weakest area"
+            >
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Weakest</p>
+              <p className="text-xs text-white font-medium truncate mt-0.5">{weakestHint || "Keep going to surface"}</p>
+            </button>
+            <button
+              onClick={() => setCurrentView("rapid-fire")}
+              className="rounded-xl p-3 bg-slate-900/60 border border-slate-700/50 hover:border-amber-500/50 transition-colors text-left"
+              aria-label="Start rapid-fire drill"
+            >
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Rapid-fire</p>
+              <p className="text-xs text-white font-medium mt-0.5">30s per question</p>
+            </button>
+          </div>
+        )}
+
         {/* Hero Section */}
         <div className="mb-14 animate-fade-in-up">
           <div className="flex flex-col items-center text-center">
@@ -447,6 +636,27 @@ export default function Home() {
                 style={{ width: `${completionPct}%` }}
               />
             </div>
+          </div>
+        )}
+
+        {/* Actionable Insight Card */}
+        {!isFirstTime && weakestHint && weakestCase && !searchQuery && (
+          <div className="mb-10 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-rose-500/5 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-up">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl mt-0.5" aria-hidden>🎯</span>
+              <div>
+                <p className="text-[11px] text-amber-300 uppercase tracking-wider font-semibold">Today&apos;s Focus</p>
+                <p className="text-sm text-white font-medium mt-0.5">
+                  You&apos;re weakest in <span className="text-amber-300">{weakestHint}</span> — spend 20–30 min here today.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleSelectCase(weakestCase)}
+              className="shrink-0 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold transition-colors"
+            >
+              Start a {weakestHint} case →
+            </button>
           </div>
         )}
 
@@ -570,16 +780,29 @@ export default function Home() {
         {/* Study Modes */}
         {!searchQuery && (
           <>
-            <div className="mb-3">
-              <h3 className="text-xs text-slate-500 uppercase tracking-[0.2em] font-medium">Study Modes</h3>
+            <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
+              <h3 className="text-xs text-slate-500 uppercase tracking-[0.2em] font-medium">
+                {examWeekMode ? "Exam-Week Modes (High-Yield Only)" : "Study Modes"}
+              </h3>
+              <button
+                onClick={() => setExamWeekMode(!examWeekMode)}
+                className={`text-[11px] px-3 py-1.5 rounded-full border transition-colors ${examWeekMode ? "bg-rose-500/20 border-rose-500/40 text-rose-200" : "bg-slate-800/60 border-slate-700/50 text-slate-400 hover:text-white"}`}
+                aria-pressed={examWeekMode}
+                aria-label="Toggle Exam-Week Mode"
+              >
+                {examWeekMode ? "🔥 Exam-Week Mode ON" : "Exam-Week Mode"}
+              </button>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-14">
-              {[
+              {([
                 {
                   label: "Due Today",
                   desc: dueCount > 0
                     ? `${dueCount} due${overdueCount > 0 ? `, ${overdueCount} overdue` : ""}`
-                    : "Nothing due — all caught up",
+                    : progress.totalCasesAttempted === 0
+                    ? "Study a case to build your review queue"
+                    : "All caught up — come back tomorrow",
+                  highYield: true,
                   icon: "📅",
                   iconBg: overdueCount > 0 ? "bg-rose-500/10 text-rose-400" : "bg-primary-500/10 text-primary-400",
                   border: overdueCount > 0 ? "border-rose-500/20" : "border-primary-500/15",
@@ -589,10 +812,13 @@ export default function Home() {
                   label: "Weakness Drill",
                   desc: weakestHint
                     ? `Next recommended: ${weakestHint}`
+                    : progress.totalCasesAttempted === 0
+                    ? "Complete cases to unlock weakness targeting"
                     : "Target your lowest-scoring areas",
                   icon: "🎯",
                   iconBg: "bg-cyan-500/10 text-cyan-400", border: "border-cyan-500/15",
                   action: () => setCurrentView("weakness-quiz"),
+                  highYield: true,
                 },
                 {
                   label: "Random Case", desc: "Jump into a surprise case", icon: "🎲",
@@ -601,53 +827,75 @@ export default function Home() {
                     const allCases = database.subspecialties.flatMap((s) => s.cases.filter((c) => c.questions.length > 0));
                     handleSelectCase(allCases[Math.floor(Math.random() * allCases.length)]);
                   },
+                  highYield: false,
                 },
                 {
                   label: "Exam Simulation", desc: "Timed mock exam with random cases", icon: "⏱️",
                   iconBg: "bg-amber-500/10 text-amber-400", border: "border-amber-500/15",
                   action: () => setCurrentView("exam"),
+                  highYield: false,
                 },
                 {
                   label: "Quick Review", desc: "Browse answers without scoring", icon: "📋",
                   iconBg: "bg-primary-500/10 text-primary-400", border: "",
                   action: () => setCurrentView("review"),
+                  highYield: false,
                 },
                 {
                   label: "Flashcards", desc: "Rapid concept review cards", icon: "🃏",
                   iconBg: "bg-violet-500/10 text-violet-400", border: "",
                   action: () => setCurrentView("flashcards"),
+                  highYield: false,
+                },
+                {
+                  label: "My Flashcards", desc: "Your custom cards — SRS-scheduled", icon: "📇",
+                  iconBg: "bg-fuchsia-500/10 text-fuchsia-400", border: "",
+                  action: () => setCurrentView("user-flashcards"),
+                  highYield: true,
                 },
                 {
                   label: "Cram Sheet", desc: "Printable high-yield subspecialty reference", icon: "📝",
                   iconBg: "bg-amber-500/10 text-amber-400", border: "border-amber-500/15",
                   action: () => setCurrentView("cram"),
+                  highYield: true,
                 },
                 {
                   label: "AI Examiner", desc: "AI tutor, mock examiner & quiz", icon: "🤖",
                   iconBg: "bg-primary-500/10 text-primary-400", border: "border-primary-500/15",
                   action: () => setCurrentView("ai-examiner"),
+                  highYield: true,
                 },
                 {
                   label: "Rapid-Fire Drill", desc: "30s per question — exam pressure simulator", icon: "⚡",
                   iconBg: "bg-rose-500/10 text-rose-400", border: "border-rose-500/15",
                   action: () => setCurrentView("rapid-fire"),
+                  highYield: true,
+                },
+                {
+                  label: "🧠 Q-Bank", desc: "50 high-yield board-style Q&A", icon: "🧠",
+                  iconBg: "bg-fuchsia-500/10 text-fuchsia-400", border: "border-fuchsia-500/15",
+                  action: () => setCurrentView("qbank"),
+                  highYield: true,
                 },
                 {
                   label: "Practice Patterns", desc: "AAO PPP guidelines & quizzes", icon: "📋",
                   iconBg: "bg-teal-500/10 text-teal-400", border: "border-teal-500/15",
                   action: () => setCurrentView("ppp"),
+                  highYield: false,
                 },
                 {
                   label: "Analytics", desc: "Performance analytics & insights", icon: "📊",
                   iconBg: "bg-purple-500/10 text-purple-400", border: "",
                   action: () => setCurrentView("dashboard"),
+                  highYield: false,
                 },
                 {
                   label: "Settings / Data", desc: "Export, import, or reset your progress", icon: "⚙️",
                   iconBg: "bg-slate-500/10 text-slate-300", border: "",
                   action: () => setCurrentView("settings"),
+                  highYield: false,
                 },
-              ].map((item) => (
+              ] as const).filter((item) => !examWeekMode || item.highYield).map((item) => (
                 <button
                   key={item.label}
                   onClick={item.action}
