@@ -3,39 +3,49 @@ import { logEvent } from "@/lib/telemetry";
 import { buildRelevantContext } from "@/lib/ai-context";
 
 /**
- * Ollama Cloud chat proxy.
+ * Chat proxy with multi-provider cascade.
  *
- * Primary: gpt-oss:120b — fast (sub-5s first token), strong clinical reasoning.
- * Optional: kimi-k2.6:cloud — deep thinking, 256K context, slower (~30-60s).
- *   Enable with body.deep_thinking === true (not wired by default).
- * Fallback: gpt-oss:20b — cheaper fallback if 120b is rate-limited.
+ * Primary:  Gemini 3 Flash Preview (Google Generative Language API)
+ *           — ~1-5s first-token, excellent clinical reasoning.
+ * Fallback: Kimi K2.6 (Ollama Cloud) — deep reasoning, slower (~30-60s).
  *
- * Streams NDJSON -> OpenAI-style SSE and emits heartbeat comments every
- * 5s while upstream is silent, so Vercel's edge doesn't buffer and the
- * client can show live progress.
+ * Converts each provider's native streaming format into a unified
+ * OpenAI-style SSE stream so the client parser doesn't change:
+ *   data: {"choices":[{"delta":{"content":"..."}}]}
+ *
+ * API keys are server-side only. `GOOGLE_API_KEY` primary, `OLLAMA_API_KEY` fallback.
+ *
+ * Behavior:
+ *   - Per-IP token-bucket rate limit (30 req/min)
+ *   - 85s upstream timeout (< Vercel 90s edge limit)
+ *   - Scheduled SSE heartbeat every 5s if idle (keeps connection warm,
+ *     prevents edge buffering)
+ *   - Structured error codes: auth | rate_limited | timeout | model |
+ *     network | bad_request | config | upstream
  */
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
-const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "https://ollama.com";
-const DEFAULT_PRIMARY = "gpt-oss:120b";
-const DEFAULT_FALLBACK = "gpt-oss:20b";
-const DEEP_MODEL = "kimi-k2.6:cloud";
+const GEMINI_MODEL = "gemini-3-flash-preview";
+const GEMINI_ENDPOINT = (model: string, key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${encodeURIComponent(key)}&alt=sse`;
 
-const PRIMARY_MODEL = process.env.OLLAMA_MODEL || DEFAULT_PRIMARY;
-const FALLBACK_MODEL = process.env.OLLAMA_FALLBACK_MODEL || DEFAULT_FALLBACK;
+const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "https://ollama.com";
+const OLLAMA_PRIMARY = process.env.OLLAMA_MODEL || "kimi-k2.6:cloud";
+const OLLAMA_FALLBACK = process.env.OLLAMA_FALLBACK_MODEL || "gpt-oss:120b";
 
 const RATE_MAX = 30;
 const RATE_WINDOW_MS = 60_000;
-const TIMEOUT_MS = 85_000; // slightly under Vercel maxDuration 90s
+const TIMEOUT_MS = 85_000;
 const HEARTBEAT_MS = 5_000;
-const MAX_RETRIES = 2;
-const NON_RETRYABLE = new Set([400, 401, 403, 404]);
 
-interface IncomingMessage { role: "system" | "user" | "assistant"; content: string }
+interface IncomingMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
 
-// --- Rate limiter (per-IP token bucket) ----------------------------------
+// --- Rate limiter ---------------------------------------------------------
 interface Bucket { tokens: number; resetAt: number }
 const buckets = new Map<string, Bucket>();
 let lastCleanup = Date.now();
@@ -62,7 +72,7 @@ function rateLimit(ip: string): { ok: true } | { ok: false; retryAfter: number }
   return { ok: true };
 }
 
-// --- SSE helpers ----------------------------------------------------------
+// --- SSE helpers (always emit OpenAI-style to the client) -----------------
 const enc = new TextEncoder();
 const sseEncode = (text: string) =>
   enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
@@ -71,42 +81,193 @@ const sseError = (code: string, message: string) =>
 const sseHeartbeat = () => enc.encode(`: heartbeat\n\n`);
 const sseDone = () => enc.encode("data: [DONE]\n\n");
 
-// --- Upstream fetch with retry-with-jitter -------------------------------
-async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
-  let attempt = 0;
-  let lastErr: unknown;
-  for (;;) {
-    try {
-      const res = await fetch(url, init);
-      if (res.ok) return res;
-      if (NON_RETRYABLE.has(res.status) || attempt >= MAX_RETRIES) return res;
-      lastErr = `status ${res.status}`;
-      try { await res.body?.cancel(); } catch { /* ignore */ }
-    } catch (err) {
-      if ((err as Error)?.name === "AbortError" || attempt >= MAX_RETRIES) throw err;
-      lastErr = err;
-    }
-    attempt += 1;
-    const delay = Math.min(2000, 250 * 2 ** (attempt - 1)) + Math.random() * 200;
-    logEvent({
-      type: "warning",
-      message: "ollama upstream retry",
-      context: { attempt, delayMs: Math.round(delay), lastErr: String(lastErr) },
-    });
-    await new Promise((r) => setTimeout(r, delay));
+// --- Message transforms ---------------------------------------------------
+
+/** OpenAI-style -> Gemini-style. Concatenates all system messages into a
+ *  single systemInstruction, converts assistant→model, wraps text in parts.
+ */
+function toGeminiBody(
+  messages: IncomingMessage[],
+  temperature: number
+): unknown {
+  const sys = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const conv = messages.filter((m) => m.role !== "system");
+  const contents = conv.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+  // Gemini requires the first turn to be "user" — if the conversation begins
+  // with an assistant greeting (auto-start), prepend a synthetic user turn.
+  if (contents.length && contents[0].role !== "user") {
+    contents.unshift({ role: "user", parts: [{ text: "(session start)" }] });
   }
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: {
+      temperature,
+      maxOutputTokens: 2500,
+      responseModalities: ["TEXT"],
+    },
+    // safetySettings loose for medical content (education)
+    safetySettings: [
+      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+    ],
+  };
+  if (sys) body.systemInstruction = { parts: [{ text: sys }] };
+  return body;
+}
+
+// --- Streaming adapters ---------------------------------------------------
+
+type StreamCtrl = ReadableStreamDefaultController<Uint8Array>;
+
+/** Adapt Gemini SSE stream to OpenAI-style chunks flushed into ctrl. */
+async function pumpGemini(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  ctrl: StreamCtrl,
+  onFlush: () => void
+): Promise<{ sawContent: boolean; upstreamError?: string }> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let sawContent = false;
+  let upstreamError: string | undefined;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    // eslint-disable-next-line no-cond-assign
+    while ((idx = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line || line.startsWith(":")) continue;
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6);
+      if (data === "[DONE]") continue;
+      try {
+        const obj = JSON.parse(data);
+        // Error frame
+        if (obj.error) {
+          upstreamError = obj.error?.message || "Gemini error";
+          break;
+        }
+        const candidates = obj.candidates;
+        if (!Array.isArray(candidates)) continue;
+        for (const cand of candidates) {
+          const parts = cand?.content?.parts;
+          if (!Array.isArray(parts)) continue;
+          for (const p of parts) {
+            if (p?.text) {
+              sawContent = true;
+              ctrl.enqueue(sseEncode(p.text));
+              onFlush();
+            }
+          }
+        }
+      } catch {
+        // skip malformed
+      }
+    }
+  }
+  return { sawContent, upstreamError };
+}
+
+/** Adapt Ollama NDJSON stream to OpenAI-style chunks flushed into ctrl. */
+async function pumpOllama(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  ctrl: StreamCtrl,
+  onFlush: () => void,
+  showThinking: boolean
+): Promise<{ sawContent: boolean; upstreamError?: string }> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let sawContent = false;
+  let upstreamError: string | undefined;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    // eslint-disable-next-line no-cond-assign
+    while ((idx = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line) continue;
+      try {
+        const obj = JSON.parse(line) as {
+          message?: { content?: string; thinking?: string };
+          done?: boolean;
+          error?: string;
+        };
+        if (obj.error) {
+          upstreamError = obj.error;
+          break;
+        }
+        const content = obj.message?.content || "";
+        if (content) {
+          sawContent = true;
+          ctrl.enqueue(sseEncode(content));
+          onFlush();
+        } else if (showThinking && obj.message?.thinking) {
+          ctrl.enqueue(sseEncode("\u200b"));
+          onFlush();
+        }
+        if (obj.done) break;
+      } catch {
+        // skip malformed
+      }
+    }
+  }
+  return { sawContent, upstreamError };
+}
+
+// --- Provider invocations -------------------------------------------------
+
+async function callGemini(
+  messages: IncomingMessage[],
+  temperature: number,
+  signal: AbortSignal
+): Promise<Response> {
+  const key = process.env.GOOGLE_API_KEY || "";
+  if (!key) throw new Error("GOOGLE_API_KEY missing");
+  return fetch(GEMINI_ENDPOINT(GEMINI_MODEL, key), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(toGeminiBody(messages, temperature)),
+    signal,
+  });
+}
+
+async function callOllama(
+  model: string,
+  messages: IncomingMessage[],
+  temperature: number,
+  signal: AbortSignal
+): Promise<Response> {
+  const key = process.env.OLLAMA_API_KEY || "";
+  if (!key) throw new Error("OLLAMA_API_KEY missing");
+  return fetch(`${OLLAMA_BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true,
+      options: { temperature },
+    }),
+    signal,
+  });
 }
 
 // --- Route handler --------------------------------------------------------
-export async function POST(request: NextRequest) {
-  const apiKey = process.env.OLLAMA_API_KEY || "";
-  if (!apiKey) {
-    return Response.json(
-      { error: { code: "config", message: "Server not configured: OLLAMA_API_KEY missing." } },
-      { status: 500 }
-    );
-  }
 
+export async function POST(request: NextRequest) {
+  // Rate limit
   const rl = rateLimit(getClientIp(request));
   if (!rl.ok) {
     return new Response(
@@ -115,11 +276,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Parse body
   let body: {
     messages?: IncomingMessage[];
     think?: boolean;
     temperature?: number;
     deep_thinking?: boolean;
+    provider?: "gemini" | "ollama";
   } = {};
   try { body = await request.json(); }
   catch {
@@ -136,14 +299,14 @@ export async function POST(request: NextRequest) {
     content: (m.content || "").toString().slice(0, 20000),
   }));
 
-  // Retrieval: ground the model in curated board-relevant references.
+  // Retrieval grounding
   const lastUser = [...normalized].reverse().find((m) => m.role === "user");
-  if (lastUser && lastUser.content) {
+  if (lastUser?.content) {
     const ctxBlock = buildRelevantContext(lastUser.content);
     if (ctxBlock) {
       normalized.unshift({
         role: "system",
-        content: "RELEVANT REFERENCES (trust these over general knowledge):\n" + ctxBlock,
+        content: "RELEVANT REFERENCES (trust over general knowledge):\n" + ctxBlock,
       });
     }
   }
@@ -151,111 +314,100 @@ export async function POST(request: NextRequest) {
   const showThinking = body.think === true;
   const temperature = typeof body.temperature === "number" ? body.temperature : 0.4;
 
-  // Model cascade: caller can opt into deep reasoning with Kimi, but by
-  // default we use gpt-oss:120b for speed. Fallback to gpt-oss:20b.
-  const primary = body.deep_thinking ? DEEP_MODEL : PRIMARY_MODEL;
-  const fallback = body.deep_thinking ? PRIMARY_MODEL : FALLBACK_MODEL;
-  const models = [primary, fallback];
-  let lastError = "";
+  // Provider cascade. Gemini primary. Ollama fallback if explicitly requested
+  // (deep_thinking / provider override) or if Gemini fails.
+  const wantOllama = body.provider === "ollama" || body.deep_thinking === true;
+  const hasGoogle = !!process.env.GOOGLE_API_KEY;
+  const hasOllama = !!process.env.OLLAMA_API_KEY;
 
-  for (let i = 0; i < models.length; i++) {
-    const model = models[i];
+  type ProviderTag = { name: "gemini" } | { name: "ollama"; model: string };
+  const providers: ProviderTag[] = [];
+  if (wantOllama && hasOllama) {
+    providers.push({ name: "ollama", model: body.deep_thinking ? OLLAMA_PRIMARY : OLLAMA_FALLBACK });
+  }
+  if (hasGoogle) providers.push({ name: "gemini" });
+  if (hasOllama) providers.push({ name: "ollama", model: OLLAMA_FALLBACK });
+
+  if (providers.length === 0) {
+    return Response.json(
+      { error: { code: "config", message: "No AI provider configured. Set GOOGLE_API_KEY or OLLAMA_API_KEY." } },
+      { status: 500 }
+    );
+  }
+
+  // Dedup providers while preserving order
+  const seen = new Set<string>();
+  const orderedProviders = providers.filter((p) => {
+    const key = p.name === "ollama" ? `ollama:${p.model}` : "gemini";
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  let lastErr = "";
+
+  for (let i = 0; i < orderedProviders.length; i++) {
+    const p = orderedProviders[i];
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
-      const upstream = await fetchWithRetry(`${OLLAMA_BASE}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model,
-          messages: normalized,
-          stream: true,
-          options: { temperature },
-        }),
-        signal: controller.signal,
-      });
+      const upstream =
+        p.name === "gemini"
+          ? await callGemini(normalized, temperature, controller.signal)
+          : await callOllama(p.model, normalized, temperature, controller.signal);
 
       if (!upstream.ok || !upstream.body) {
-        lastError = `Upstream ${upstream.status} on ${model}`;
-        logEvent({ type: "error", message: "ollama non-ok", context: { status: upstream.status, model } });
+        // Capture upstream error body for debugging
+        let debug = "";
+        try { debug = (await upstream.text()).slice(0, 300); } catch { /* ignore */ }
+        lastErr = `${p.name} ${upstream.status}: ${debug}`;
+        logEvent({ type: "error", message: "upstream non-ok", context: { provider: p.name, status: upstream.status } });
         clearTimeout(timeoutId);
+        // Auth errors: stop immediately
         if (upstream.status === 401 || upstream.status === 403) {
-          return Response.json({ error: { code: "auth", message: "AI service authentication failed." } }, { status: 502 });
+          return Response.json(
+            { error: { code: "auth", message: `AI service authentication failed (${p.name}).` } },
+            { status: 502 }
+          );
         }
         continue;
       }
 
+      const label = p.name === "ollama" ? `${p.name}:${p.model}` : p.name;
       const usedFallback = i > 0;
+
       let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
       const readable = new ReadableStream({
         async start(ctrl) {
-          // Single initial heartbeat so the client opens its reader and
-          // edge proxies see activity immediately. Do NOT spam heartbeats
-          // per thinking token — that fills the TCP/HTTP/2 buffer and
-          // delays the real content chunks from reaching the client.
+          // Prime: immediate heartbeat flushes headers + opens reader
           try { ctrl.enqueue(sseHeartbeat()); } catch { /* ignore */ }
-
           if (usedFallback) {
-            try { ctrl.enqueue(sseEncode(`_(Using ${model} fallback)_\n\n`)); } catch { /* ignore */ }
+            try { ctrl.enqueue(sseEncode(`_(Using ${label} fallback)_\n\n`)); } catch { /* ignore */ }
           }
 
-          // Scheduled heartbeat only when NO data has flushed for HEARTBEAT_MS.
-          // This is the only anti-idle mechanism — don't duplicate it elsewhere.
           let lastFlushAt = Date.now();
+          const onFlush = () => { lastFlushAt = Date.now(); };
+
           heartbeatTimer = setInterval(() => {
             if (Date.now() - lastFlushAt >= HEARTBEAT_MS) {
-              try {
-                ctrl.enqueue(sseHeartbeat());
-                lastFlushAt = Date.now();
-              } catch { /* ignore */ }
+              try { ctrl.enqueue(sseHeartbeat()); lastFlushAt = Date.now(); } catch { /* ignore */ }
             }
           }, HEARTBEAT_MS);
 
           const reader = upstream.body!.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let sawContent = false;
-
           try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buffer += decoder.decode(value, { stream: true });
-              let idx: number;
-              // eslint-disable-next-line no-cond-assign
-              while ((idx = buffer.indexOf("\n")) >= 0) {
-                const line = buffer.slice(0, idx).trim();
-                buffer = buffer.slice(idx + 1);
-                if (!line) continue;
-                try {
-                  const obj = JSON.parse(line) as {
-                    message?: { content?: string; thinking?: string };
-                    done?: boolean;
-                    error?: string;
-                  };
-                  if (obj.error) {
-                    ctrl.enqueue(sseError("model", obj.error));
-                    lastFlushAt = Date.now();
-                    continue;
-                  }
-                  const content = obj.message?.content || "";
-                  // Thinking tokens are INTENTIONALLY dropped unless showThinking
-                  // is requested. The scheduled heartbeat handles idle periods.
-                  if (content) {
-                    sawContent = true;
-                    ctrl.enqueue(sseEncode(content));
-                    lastFlushAt = Date.now();
-                  } else if (showThinking && obj.message?.thinking) {
-                    ctrl.enqueue(sseEncode(`\u200b`));
-                    lastFlushAt = Date.now();
-                  }
-                  if (obj.done) break;
-                } catch { /* skip malformed */ }
-              }
+            const result =
+              p.name === "gemini"
+                ? await pumpGemini(reader, ctrl, onFlush)
+                : await pumpOllama(reader, ctrl, onFlush, showThinking);
+
+            if (result.upstreamError) {
+              ctrl.enqueue(sseError("model", result.upstreamError));
+            } else if (!result.sawContent) {
+              ctrl.enqueue(sseError("model", "No response from model."));
             }
-            if (!sawContent) ctrl.enqueue(sseError("model", "No response from model."));
             ctrl.enqueue(sseDone());
           } catch (streamErr) {
             const isAbort = (streamErr as Error)?.name === "AbortError";
@@ -278,14 +430,15 @@ export async function POST(request: NextRequest) {
           "Cache-Control": "no-cache, no-transform",
           Connection: "keep-alive",
           "X-Accel-Buffering": "no",
+          "X-AI-Provider": label,
         },
       });
     } catch (err) {
       clearTimeout(timeoutId);
       const isAbort = (err as Error)?.name === "AbortError";
-      lastError = `${isAbort ? "Timeout" : "Fetch error"} on ${model}: ${(err as Error).message}`;
-      logEvent({ type: "error", message: "ollama fetch failed", context: { model, error: lastError } });
-      if (isAbort && i === models.length - 1) {
+      lastErr = `${p.name} error: ${isAbort ? "timeout" : (err as Error).message}`;
+      logEvent({ type: "error", message: "upstream fetch failed", context: { provider: p.name, err: lastErr } });
+      if (isAbort && i === orderedProviders.length - 1) {
         return Response.json({ error: { code: "timeout", message: "Upstream timed out." } }, { status: 504 });
       }
       continue;
@@ -293,7 +446,7 @@ export async function POST(request: NextRequest) {
   }
 
   return Response.json(
-    { error: { code: "upstream", message: `All AI models failed. ${lastError}` } },
+    { error: { code: "upstream", message: `All AI providers failed. ${lastErr}` } },
     { status: 502 }
   );
 }
