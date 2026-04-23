@@ -1,13 +1,21 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { CasesDatabase, CaseData } from "@/lib/types";
-import { FATAL_FLAWS } from "@/lib/fatal-flaws";
 
 /**
- * AI Examiner — powered by Kimi K2.6 via Ollama Cloud (server-side proxy).
- * API key lives server-side only (OLLAMA_API_KEY env var).
- * Client never sees it.
+ * AI Examiner — powered by gpt-oss:120b (fast) via Ollama Cloud.
+ * Kimi K2.6 (deep reasoning) available as an opt-in model.
+ * API key server-side only; client never sees it.
+ *
+ * Fixes applied after debugging session:
+ *   - Slim system prompts (~600 tokens, was ~7000). Fatal flaws injected
+ *     via retrieval only when relevant.
+ *   - Every mode auto-starts with meaningful content on session start.
+ *   - Case images embedded directly in chat bubbles (not just linked).
+ *   - Live elapsed-time indicator while the model is responding.
+ *   - Inline markdown image rendering (![alt](url) → <img>).
+ *   - Prompt quality: cite briefly, always explain WHY+HOW, end with 2-3 pearls.
  */
 
 interface AIExaminerProps {
@@ -22,318 +30,153 @@ interface Message {
 }
 
 type ExaminerMode =
-  | "examiner"       // Full mock oral board with curveballs
-  | "tutor"          // Deep teaching on any topic
-  | "quiz"           // Rapid-fire questions
-  | "free-chat"      // Open discussion
-  | "soap"           // SOAP-note practice on a case
-  | "deep-dive"      // Subspecialty deep-dive lecture
-  | "case-builder"   // AI generates new cases for practice
-  | "pearls"         // High-yield pearl dump on a topic
-  | "viva"           // Verbal-only viva voce — forces terse answers
-  | "ddx-drill";     // "Give me 5 DDx for..." drill
+  | "examiner"
+  | "viva"
+  | "quiz"
+  | "ddx-drill"
+  | "soap"
+  | "case-builder"
+  | "deep-dive"
+  | "pearls"
+  | "tutor"
+  | "free-chat";
+
+// ---------------------------------------------------------------------------
+// System prompts — intentionally lean. Retrieval layer on the server adds
+// fatal-flaw / trial / PPP context only when relevant to the query.
+// ---------------------------------------------------------------------------
+
+const BASE_PROMPT = `You are a world-class ophthalmology oral board examiner, educator, and practicing ophthalmologist. You draw on AAO PPP guidelines, BCSC, Ryan's Retina, Albert & Jakobiec, Walsh & Hoyt, Kanski, landmark RCTs, and surgical textbooks.
+
+RESPONSE QUALITY — every substantive answer must:
+1. Be clinically, surgically, and board-relevant.
+2. Explain the WHY (mechanism/pathophysiology) AND the HOW (technique or decision rule).
+3. Cite briefly in-line: e.g. "per ONTT", "AAO PPP 2023 Glaucoma", "BCSC §10-ch4", "EVS", "DRCR Protocol T", "Ryan §58". Prefer short in-text references over paragraphs.
+4. End with 2-3 high-yield PEARLS (one-liners, board-hitting).
+5. Name the must-not-miss fatal flaw if one applies, and say the exact safety-net phrase.
+6. Use specific drug names, doses, and surgical steps — never vague "antibiotics".
+7. When you know a trial's result, state the number (e.g., "ONTT: IVMP 1g × 3d sped recovery but did not change final VA").
+
+ABO EXAM FORMAT (know cold):
+- 42 Patient Management Problems across 3 virtual rooms (50 min each), 6 equally-weighted topic areas: Anterior, External/Adnexa, Neuro/Orbit, Optics, Peds/Strab, Posterior.
+- Compensatory 3-domain scoring 0-3: Data Acquisition · Diagnosis · Management. Pass/fail only.
+- 8-element PMP: Describe → History → Exam → Differential (incl. can't-miss) → Workup → Diagnosis → Management → Follow-up. Management+follow-up ≈ 40% of score.
+- Target pace: ≤ 3.5 min/case.
+
+You are also a learning expert. Teach with active recall, interleaving, "soliloquy" verbal scripts, and spaced review. Be direct and information-dense — no fluff.`;
 
 function buildSystemPrompt(
   mode: ExaminerMode,
-  database: CasesDatabase,
   currentCase?: CaseData | null,
   subspecialtyFocus?: string
 ): string {
-  const imageUrl = currentCase?.imageFile
-    ? `/images/${currentCase.imageFile}`
-    : currentCase?.externalImageUrl || null;
-  const imageInstruction = imageUrl
-    ? `\nCLINICAL IMAGE URL: ${imageUrl}\nIMPORTANT: When presenting this case, provide the clinical image link in markdown format so the candidate can view it: [View Clinical Image](${imageUrl}). Present it at the start of the case before asking for the image description.`
-    : "";
-  const caseContext = currentCase
-    ? `\n\nCURRENT CASE CONTEXT:\nTitle: ${currentCase.diagnosisTitle || currentCase.title}\nPresentation: ${currentCase.presentation}\nPhoto Description: ${currentCase.photoDescription || "(none)"}${imageInstruction}\nQuestions and Model Answers:\n${currentCase.questions
-        .map((q) => `Q${q.number}: ${q.question}\nA: ${q.answer}`)
-        .join("\n\n")}`
-    : "";
-
-  const subspecialtySummary = database.subspecialties
-    .map((s) => `${s.name}: ${s.cases.filter((c) => c.questions.length > 0).length} cases`)
-    .join(", ");
-
-  // Fatal-flaw grounding: inject the full 25 must-not-miss items so the
-  // model never hallucinates around them and always surfaces them when relevant.
-  const fatalFlawContext = FATAL_FLAWS
-    .slice(0, 25)
-    .map(
-      (f) =>
-        `- [${f.subspecialty}] ${f.scenario} → MUST NOT MISS: ${f.mustNotMiss}. Say: ${f.safetyNetPhrase}`
-    )
-    .join("\n");
-
-  const base = `You are an expert ophthalmology oral board examiner and educator with deep knowledge of all subspecialties: ${subspecialtySummary}.
-
-EXAM FORMAT (ABO Virtual Oral Examination):
-- 42 Patient Management Problems (PMPs) across 3 virtual rooms, 50 minutes each
-- 2 examiners per room, each presenting 7 cases (14 per room, ~3.5 min per case)
-- 6 equally-weighted topic areas (16.7% each): Anterior Segment, External Eye & Adnexa, Neuro-Ophthalmology & Orbit, Optics/Visual Physiology/Refractive Errors, Pediatric Ophthalmology & Strabismus, Posterior Segment
-- Room pairings: Room 1 (Anterior + Optics), Room 2 (External + Pediatrics), Room 3 (Neuro + Posterior)
-
-ABO 3-DOMAIN SCORING (0-3 scale): Data Acquisition, Diagnosis, Management. Compensatory — strength offsets weakness. Pass/fail only.
-
-THE 8-ELEMENT PMP FRAMEWORK (enforce this order):
-1. DESCRIBE — laterality, location, morphology, color, size, associated findings (2-3 sentences, NO dx yet)
-2. HISTORY — focused, hypothesis-driven (not a full ROS)
-3. EXAM — VA, pupils (RAPD), IOP, motility, CVF, slit lamp, DFE — tailored to complaint
-4. DIFFERENTIAL — 3-4 entities, ordered by likelihood, ALWAYS include the can't-miss
-5. WORKUP — targeted labs/imaging (OCT, FA, B-scan, MRI, ESR/CRP) + WHY
-6. DIAGNOSIS — most likely + brief justification
-7. MANAGEMENT — specific drugs/doses/procedures + counseling + referral
-8. FOLLOW-UP — explicit interval + what to check (most candidates forget this; HEAVILY weighted)
-
-Management (7+8) ≈ 40% of the score. Specificity beats vagueness every time.
-
-FATAL-FLAW REGISTRY — these omissions fail candidates on the real exam:
-${fatalFlawContext}
-
-CLINICAL ACCURACY:
-- Cite 2024-2026 AAO PPP guidelines. Landmark trials: ONTT, CATT, DRCR.net, EVS, COMS, AREDS2, PEDIG, IIHTT, OHTS, MARINA, ANCHOR, VIEW, BRAVO, CRUISE, SCORE, CVOS, BVOS
-- Grading: ETDRS, SUN, Frisen, ROP ICROP, Shaffer/Spaeth angle
-- Specific drug names/doses/frequencies — never "give antibiotics"
-- Surgical indications AND complications for every procedure mentioned${caseContext}${
-    subspecialtyFocus ? `\n\nSUBSPECIALTY FOCUS: ${subspecialtyFocus}` : ""
-  }`;
-
+  let modeRules = "";
   switch (mode) {
     case "examiner":
-      return `${base}
-
-MODE: ORAL BOARD EXAMINER SIMULATION
-You are a real ABO oral board examiner. Professional, neutral, terse. Do NOT give feedback during the case.
-
-RULES:
-1. PROGRESSIVE DISCLOSURE: Present only an image (if any) and a 1-sentence chief complaint. Do not provide history/exam/tests unless the candidate explicitly asks.
-2. FRAMEWORK ENFORCEMENT: If candidate jumps to treatment without a differential, interrupt: "Before management — what's your differential?"
-3. CURVEBALL: When the candidate gives a management plan, introduce ONE clinical complication (sulfa allergy, PCR during surgery, pharmacy shortage, positive preg test, etc.).
-4. PACING: If rambling, redirect: "In the interest of time, your leading diagnosis?". Target ≤ 3.5 min/case.
-5. NEUTRAL AFFECT: No "Good job" / "Correct". Use "Okay," "What else?", "Anything else?", or move on.
-6. PROBE DEPTH: Ask "Why?" and "What specific findings?" Don't accept vague answers.
-7. CASE END: After the case, break character with 3-domain scored feedback (0-3) + specific missed elements + at least 1 fatal flaw if any applied.
-
-Present cases across all 6 subspecialties.`;
-
-    case "tutor":
-      return `${base}
-
-MODE: TEACHING TUTOR
-Thorough, encouraging. For any topic:
-1. Structure response using the 8-element framework
-2. Include high-yield pearls + must-not-miss diagnoses
-3. Flag board pitfalls (unstructured delivery, overconfidence, reading examiner faces, shotgunning, missing emergencies, poor optics prep)
-4. Cite landmark trials with specific findings
-5. Use mnemonics (TFSOM, CONES, PANDAS, etc.) when applicable
-6. Connect across subspecialties
-7. Teach the "soliloquy approach" — rehearsed verbal scripts
-8. Provide a "minimum sufficient workup" — penalize shotgunning
-
-Use clear headers + bullets. End with: "Want me to quiz you on this?"`;
-
-    case "quiz":
-      return `${base}
-
-MODE: RAPID-FIRE QUIZ
-Ask rapid-fire questions across all 6 subspecialties. For each:
-1. Brief clinical stem (1-2 sentences)
-2. Focused question targeting ONE of: Data Acquisition / Diagnosis / Management
-3. Wait for candidate's answer
-4. Score on specificity — penalize "antibiotics" vs "fortified vanco + tobra q1h"
-5. Flag fatal-flaw misses
-6. Domain-tagged feedback, then next question
-
-Mix domains and subspecialties. Include curveballs (allergies, complications, contraindications). After every 10 Qs, give summary: "Data Acq: X/10, Dx: X/10, Mgmt: X/10, Fatal flaws missed: X."`;
-
-    case "soap":
-      return `${base}
-
-MODE: SOAP NOTE PRACTICE
-The candidate is practicing structured clinical documentation. Present a case scenario and ask them to write a SOAP note:
-- S (Subjective): HPI, ROS, PMH, Meds, Allergies, SH/FH
-- O (Objective): VA, IOP, pupils, motility, CVF, SL exam OU, DFE
-- A (Assessment): prioritized problem list with differentials
-- P (Plan): treatment + patient counseling + follow-up interval
-
-After they respond, critique ruthlessly: what's missing, wordy, disorganized, or vague. Show the "perfect" SOAP they should write. Target: 5-8 sentences total.`;
-
-    case "deep-dive":
-      return `${base}
-
-MODE: SUBSPECIALTY DEEP-DIVE
-Deliver a structured, board-focused lecture on the candidate's chosen topic. Format:
-1. **Epidemiology** (prevalence, demographics, risk factors)
-2. **Pathophysiology** (mechanism in 3-5 sentences)
-3. **Classic presentation** + photo description
-4. **Differential** (3-5 mimics with distinguishing features)
-5. **Workup** (tests + WHY, in order)
-6. **Diagnosis** (gold standard + confirming tests)
-7. **Management** (medical → laser → surgical tiers)
-8. **Follow-up** (intervals, what to watch for)
-9. **Landmark trials** (1-3 with key findings)
-10. **Board pearls** (5-8 high-yield one-liners)
-11. **Fatal flaws to avoid**
-
-Aim for dense, bulleted, scannable. End with a one-question pop-quiz on the most-tested fact.`;
-
-    case "case-builder":
-      return `${base}
-
-MODE: CUSTOM CASE GENERATOR
-Generate a novel, realistic oral-board-style case tailored to the candidate's request. Output strictly:
-
-**CHIEF COMPLAINT**: [1 sentence, age + sex + symptom + duration]
-**IMAGE DESCRIPTION**: [what the examiner would show on a slide]
-**KEY HISTORY**: [3-5 bullet points of what's available if asked]
-**KEY EXAM**: [relevant findings available if asked]
-**WHAT THE EXAMINER WILL PROBE**: [3 anticipated questions]
-**FATAL FLAWS THIS CASE TESTS**: [1-2 items]
-**MODEL 8-ELEMENT RESPONSE**: [a fully-worked soliloquy the candidate should be able to deliver]
-
-End with: "Ready to try this case out loud? Walk through your 8-element response."`;
-
-    case "pearls":
-      return `${base}
-
-MODE: HIGH-YIELD PEARL DUMP
-The candidate needs a cram-session dump on their requested topic. Output format:
-
-## [Topic] — Board Pearls
-
-1. [Pearl #1 — 1 line, classic association or key fact]
-2. [Pearl #2]
-...
-(aim for 10-15 pearls, board-hitting facts only)
-
-### Fatal flaws to NEVER miss
-- [Fatal flaw 1] — say exactly: "[safety-net phrase]"
-- [Fatal flaw 2]
-
-### Key trials
-- [Trial] — [1-sentence takeaway]
-
-### Mnemonics
-- [Mnemonic] — [expansion]
-
-Be dense, scannable, and board-focused. NO fluff.`;
-
+      modeRules = `MODE: ORAL BOARD EXAMINER
+Professional, neutral, terse. Progressive disclosure — give only chief complaint and image; reveal history/exam only when asked. If candidate jumps to treatment without a differential, interrupt: "Before management — your differential?" After the candidate's plan, throw ONE curveball (allergy, surgical complication, pharmacy shortage). Never say "Good job"/"Correct"; use "Okay," "What else?", or move on. End case with 3-domain score (0-3 each), missed elements, and any fatal flaw.`;
+      break;
     case "viva":
-      return `${base}
-
-MODE: VIVA VOCE
-Simulate verbal oral-exam pressure. Ask one focused clinical question. Expect a SHORT response (≤ 3 sentences). If candidate rambles, interrupt with "Stop. Commit to your diagnosis." Give neutral "Hm" or "Go on." Never validate. After 3 questions, give domain scores.
-
-Be terse. Use sentence fragments. Mimic high-pressure exam cadence.`;
-
+      modeRules = `MODE: VIVA VOCE
+Fire one focused question. Demand ≤ 3-sentence commits. If candidate rambles, interrupt: "Stop. Commit." Neutral "Hm," "Go on." After 3 Qs, give domain scores.`;
+      break;
+    case "quiz":
+      modeRules = `MODE: RAPID-FIRE QUIZ
+Ask one question at a time. Brief stem (1-2 sentences), one focused question tagged to Data-Acq / Dx / Mgmt. Wait for candidate. Score on specificity — penalize "antibiotics". Flag fatal flaws. After 10 Qs give: "Data-Acq X/10, Dx X/10, Mgmt X/10."`;
+      break;
     case "ddx-drill":
-      return `${base}
-
-MODE: DIFFERENTIAL DIAGNOSIS DRILL
-Drill the candidate on differentials. For each prompt:
-1. Present a chief complaint: e.g. "Leukocoria in a 2-year-old."
-2. Ask: "Give me 5 differentials, ordered most-likely to least. Must-not-miss first if applicable."
-3. Score on: correct order, must-not-miss included, clinical reasoning, specificity.
-4. Give the "gold-standard" 5 DDx they should have named.
-5. Move to next prompt.
-
-Cycle through all subspecialties. After 10 prompts, domain score summary.`;
-
+      modeRules = `MODE: DDX DRILL
+Present a chief complaint ("Leukocoria, 2yo"). Ask for 5 DDx ordered most-likely first, with can't-miss included. Score on order, can't-miss, reasoning. Then give gold-standard 5 DDx. Cycle subspecialties.`;
+      break;
+    case "soap":
+      modeRules = `MODE: SOAP NOTE PRACTICE
+Present a scenario. Candidate writes SOAP (S/O/A/P). Critique ruthlessly — what's missing, wordy, vague. Then show the ideal SOAP (5-8 dense sentences).`;
+      break;
+    case "case-builder":
+      modeRules = `MODE: CASE BUILDER
+Generate a novel boards-style case. Output:
+**CHIEF COMPLAINT** · **IMAGE DESCRIPTION** · **KEY HISTORY** (3-5 bullets) · **KEY EXAM** (relevant findings) · **ANTICIPATED PROBES** (3 Qs) · **FATAL FLAW TESTED** · **MODEL 8-ELEMENT RESPONSE** (fully-worked soliloquy).`;
+      break;
+    case "deep-dive":
+      modeRules = `MODE: SUBSPECIALTY DEEP-DIVE
+Lecture on the requested topic. Sections: Epidemiology · Pathophys · Classic presentation (+photo desc) · Differential (3-5) · Workup (with WHY) · Diagnosis · Management (medical→laser→surgical tiers) · Follow-up · Landmark trials (1-3, with numbers) · 5-8 board pearls · Fatal flaws. End with a pop quiz on the single most-tested fact.`;
+      break;
+    case "pearls":
+      modeRules = `MODE: PEARL DUMP
+Return the topic's top 10-15 board pearls as numbered one-liners. Then ### Fatal flaws (with exact safety-net phrases). ### Key trials (with numbers). ### Mnemonics. Dense, scannable, no fluff.`;
+      break;
+    case "tutor":
+      modeRules = `MODE: TEACHING TUTOR
+Teach the requested topic with structure + pearls + trials + mnemonics. Explain WHY and HOW. End with "Want me to quiz you on this?"`;
+      break;
     default:
-      return `${base}
-
-MODE: FREE DISCUSSION
-You can help with any ophthalmology topic. Share prep tips: 8-element PMP, 3.5-min pacing, soliloquy approach, failure modes, 2-6 month study timelines. Be helpful, specific, thorough.`;
+      modeRules = `MODE: FREE DISCUSSION
+Help with any ophthalmology or exam-prep topic. Be specific, thorough, board-relevant.`;
   }
-}
 
-// --- Error -> friendly message mapping -----------------------------------
+  const extra: string[] = [];
+  if (subspecialtyFocus) extra.push(`SUBSPECIALTY FOCUS: ${subspecialtyFocus}`);
 
-function friendlyError(code: string | undefined, message: string, retryAfter?: number): string {
-  switch (code) {
-    case "auth":
-      return "AI service auth failed. Contact support.";
-    case "rate_limited":
-      return `You're sending too fast. Wait ${retryAfter ?? 30}s.`;
-    case "timeout":
-      return "Response took too long. Try a shorter question.";
-    case "model":
-      return "AI model error. Try rephrasing.";
-    case "network":
-      return "Connection lost. Your messages are saved — retry?";
-    case "bad_request":
-      return message || "Bad request.";
-    default:
-      return message || "Something went wrong. Please retry.";
+  if (currentCase) {
+    const img =
+      currentCase.imageFile
+        ? `/images/${currentCase.imageFile}`
+        : currentCase.externalImageUrl || null;
+    const lines = [
+      `CURRENT CASE`,
+      `Title: ${currentCase.diagnosisTitle || currentCase.title}`,
+      `Presentation: ${currentCase.presentation || "(not provided)"}`,
+    ];
+    if (currentCase.photoDescription) lines.push(`Photo: ${currentCase.photoDescription}`);
+    if (img) lines.push(`Image: ${img} (use ![Clinical photo](${img}) in your first message)`);
+    if (currentCase.questions && currentCase.questions.length) {
+      const modelAnswers = currentCase.questions
+        .slice(0, 6)
+        .map((q) => `Q${q.number} ${q.question}\n   A: ${(q.answer || "").slice(0, 500)}`)
+        .join("\n");
+      lines.push(`Model answers (reference only — challenge the candidate; don't give these away):\n${modelAnswers}`);
+    }
+    extra.push(lines.join("\n"));
   }
+
+  return [BASE_PROMPT, modeRules, ...extra].join("\n\n");
 }
 
-// --- In-memory response cache for deterministic queries ------------------
-// Last 10 exact-match query->response pairs when temperature <= 0.2.
-// Per-page-load only; cleared on reload. Identical system+user messages key.
+// ---------------------------------------------------------------------------
+// Pre-computed opening messages — show INSTANTLY while AI warms up (or instead).
+// ---------------------------------------------------------------------------
 
-const CACHE_MAX = 10;
-const CACHE_TEMP_THRESHOLD = 0.2;
-const responseCache = new Map<string, string>();
-
-function cacheKey(messages: Message[]): string {
-  return JSON.stringify(messages.map((m) => ({ r: m.role, c: m.content })));
+function pickRandomCaseWithImage(database: CasesDatabase): CaseData | null {
+  const candidates = database.subspecialties
+    .flatMap((s) => s.cases)
+    .filter((c) => c.questions && c.questions.length > 0 && (c.imageFile || c.externalImageUrl));
+  if (!candidates.length) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
-function cacheGet(messages: Message[]): string | undefined {
-  const k = cacheKey(messages);
-  const hit = responseCache.get(k);
-  if (hit !== undefined) {
-    // LRU bump: re-insert so it's most-recently-used
-    responseCache.delete(k);
-    responseCache.set(k, hit);
-  }
-  return hit;
+function caseOpeningMessage(c: CaseData): string {
+  const imgUrl = c.imageFile ? `/images/${c.imageFile}` : c.externalImageUrl || "";
+  const lead = c.presentation?.trim() || c.title;
+  const parts: string[] = [];
+  if (imgUrl) parts.push(`![Clinical photo](${imgUrl})`);
+  parts.push(`**Case.** ${lead}`);
+  parts.push(`_Describe what you see in the image. Then walk me through your approach._`);
+  return parts.join("\n\n");
 }
 
-function cacheSet(messages: Message[], response: string): void {
-  const k = cacheKey(messages);
-  if (responseCache.has(k)) responseCache.delete(k);
-  responseCache.set(k, response);
-  while (responseCache.size > CACHE_MAX) {
-    const oldest = responseCache.keys().next().value;
-    if (oldest === undefined) break;
-    responseCache.delete(oldest);
-  }
-}
-
-interface StreamResult {
-  ok: boolean;
-  errorCode?: string;
-  errorMessage?: string;
-  retryAfter?: number;
-}
+// ---------------------------------------------------------------------------
+// Streaming with elapsed-time progress + error-code-aware fallback messages
+// ---------------------------------------------------------------------------
 
 async function streamViaProxy(
   messages: Message[],
   onChunk: (text: string) => void,
-  signal?: AbortSignal,
-  options: { temperature?: number } = {}
-): Promise<StreamResult> {
-  const { temperature } = options;
-  const cacheable = typeof temperature === "number" && temperature <= CACHE_TEMP_THRESHOLD;
-
-  // Cache hit: synthesize streaming so UX is identical to a real stream.
-  if (cacheable) {
-    const hit = cacheGet(messages);
-    if (hit !== undefined) {
-      // Chunk by ~40 chars with microtask yields; respects abort signal.
-      const size = 40;
-      for (let i = 0; i < hit.length; i += size) {
-        if (signal?.aborted) return { ok: false };
-        onChunk(hit.slice(i, i + size));
-        // Yield to the event loop so React can paint between chunks.
-        await new Promise((r) => setTimeout(r, 0));
-      }
-      return { ok: true };
-    }
-  }
-
+  onProgress: (firstByteMs: number) => void,
+  onError: (code: string, message: string) => void,
+  signal?: AbortSignal
+): Promise<boolean> {
+  const start = performance.now();
+  let firstByteReported = false;
   let response: Response;
   try {
     response = await fetch("/api/chat", {
@@ -341,129 +184,155 @@ async function streamViaProxy(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        ...(typeof temperature === "number" ? { temperature } : {}),
       }),
       signal,
     });
   } catch (e) {
-    if ((e as Error).name === "AbortError") return { ok: false };
-    return { ok: false, errorCode: "network", errorMessage: (e as Error).message };
+    if ((e as Error).name === "AbortError") return false;
+    onError("network", (e as Error).message || "Connection failed.");
+    return false;
   }
 
   if (!response.ok) {
-    let code: string | undefined;
-    let msg = response.statusText;
-    let retryAfter: number | undefined;
     try {
       const err = await response.json();
-      code = err?.error?.code;
-      msg = err?.error?.message || msg;
-      retryAfter = err?.error?.retryAfter;
+      const code = err?.error?.code || "upstream";
+      const msg = err?.error?.message || response.statusText;
+      onError(code, msg);
     } catch {
-      // Non-JSON error body
-      code = response.status === 429 ? "rate_limited" : "network";
+      onError("upstream", response.statusText);
     }
-    if (response.status === 429 && retryAfter === undefined) {
-      const header = response.headers.get("Retry-After");
-      if (header) retryAfter = parseInt(header, 10) || undefined;
-    }
-    return { ok: false, errorCode: code, errorMessage: msg, retryAfter };
+    return false;
   }
 
   const reader = response.body?.getReader();
-  if (!reader) return { ok: false, errorCode: "network", errorMessage: "No response body." };
-
+  if (!reader) return false;
   const decoder = new TextDecoder();
   let buffer = "";
-  let accumulated = "";
-  let mid: StreamResult | undefined;
 
   while (true) {
     let chunk;
     try {
       chunk = await reader.read();
     } catch (e) {
-      if ((e as Error).name === "AbortError") return { ok: false };
-      return { ok: false, errorCode: "network", errorMessage: (e as Error).message };
+      if ((e as Error).name === "AbortError") return false;
+      onError("network", (e as Error).message || "Stream broke.");
+      return false;
     }
     if (chunk.done) break;
-
+    if (!firstByteReported) {
+      firstByteReported = true;
+      onProgress(Math.round(performance.now() - start));
+    }
     buffer += decoder.decode(chunk.value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
-
     for (const line of lines) {
       const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(":")) continue; // heartbeat comment
       if (!trimmed.startsWith("data: ")) continue;
       const data = trimmed.slice(6);
       if (data === "[DONE]") continue;
       try {
         const parsed = JSON.parse(data);
         if (parsed.error) {
-          mid = { ok: false, errorCode: parsed.error.code, errorMessage: parsed.error.message };
+          onError(parsed.error.code || "model", parsed.error.message || "Model error.");
           continue;
         }
         const content = parsed.choices?.[0]?.delta?.content;
-        if (content) {
-          accumulated += content;
-          onChunk(content);
-        }
-      } catch {
-        // Skip malformed
-      }
+        if (content) onChunk(content);
+      } catch { /* skip malformed */ }
     }
   }
-  if (mid) return mid;
-  if (cacheable && accumulated) cacheSet(messages, accumulated);
-  return { ok: true };
+  return true;
 }
 
-function renderMarkdownContent(text: string) {
-  // Split text into segments: markdown links, bold, italic, headers, and plain text.
-  // Keep this simple; production rendering could use `marked` or `react-markdown`.
-  const parts: Array<{ type: string; content: string; href?: string }> = [];
-  let remaining = text;
+function friendlyError(code: string, msg: string): string {
+  const prefix =
+    code === "rate_limited" ? "⏱️ Slow down — " :
+    code === "timeout" ? "⌛ That took too long — try a shorter or simpler question. " :
+    code === "auth" ? "🔒 " :
+    code === "network" ? "📡 Network hiccup — " :
+    code === "model" ? "🤖 AI model error — " :
+    code === "config" ? "⚙️ " : "";
+  return `${prefix}${msg}`;
+}
 
-  while (remaining.length > 0) {
-    const matches: Array<{ type: string; index: number; match: RegExpMatchArray }> = [];
-    const linkM = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
-    if (linkM?.index !== undefined) matches.push({ type: "link", index: linkM.index, match: linkM });
-    const boldM = remaining.match(/\*\*([^*]+)\*\*/);
-    if (boldM?.index !== undefined) matches.push({ type: "bold", index: boldM.index, match: boldM });
-    const italicM = remaining.match(/(?:^|[^*])\*([^*]+)\*(?:[^*]|$)/);
-    if (italicM?.index !== undefined) matches.push({ type: "italic", index: italicM.index, match: italicM });
+// ---------------------------------------------------------------------------
+// Markdown rendering: links, bold, italic, AND inline images.
+// ---------------------------------------------------------------------------
 
-    matches.sort((a, b) => a.index - b.index);
+interface MdPart {
+  type: "text" | "link" | "bold" | "italic" | "image" | "heading" | "br";
+  content: string;
+  href?: string;
+  level?: number;
+}
 
-    if (matches.length === 0) {
-      parts.push({ type: "text", content: remaining });
-      break;
+function parseMarkdown(text: string): MdPart[] {
+  const out: MdPart[] = [];
+  // Split by lines for heading/break detection, but keep inline inside each line
+  const lines = text.split("\n");
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      out.push({ type: "heading", content: headingMatch[2], level: headingMatch[1].length });
+      if (li < lines.length - 1) out.push({ type: "br", content: "" });
+      continue;
     }
-    const earliest = matches[0]!;
-    if (earliest.index > 0) parts.push({ type: "text", content: remaining.slice(0, earliest.index) });
-
-    if (earliest.type === "link") {
-      parts.push({ type: "link", content: earliest.match![1], href: earliest.match![2] });
-    } else if (earliest.type === "bold") {
-      parts.push({ type: "bold", content: earliest.match![1] });
-    } else if (earliest.type === "italic") {
-      parts.push({ type: "italic", content: earliest.match![1] });
+    // Parse inline
+    let rem = line;
+    while (rem.length > 0) {
+      const matches: Array<{ type: MdPart["type"]; index: number; full: string; c: string; href?: string }> = [];
+      const imgM = rem.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+      if (imgM?.index !== undefined) matches.push({ type: "image", index: imgM.index, full: imgM[0], c: imgM[1], href: imgM[2] });
+      const lnkM = rem.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (lnkM?.index !== undefined) matches.push({ type: "link", index: lnkM.index, full: lnkM[0], c: lnkM[1], href: lnkM[2] });
+      const bM = rem.match(/\*\*([^*]+)\*\*/);
+      if (bM?.index !== undefined) matches.push({ type: "bold", index: bM.index, full: bM[0], c: bM[1] });
+      const iM = rem.match(/(?:^|[^*_])[*_]([^*_]+)[*_](?:[^*_]|$)/);
+      if (iM?.index !== undefined) {
+        const inner = iM[1];
+        const leading = iM[0].indexOf(inner) - 1;
+        const absIdx = iM.index + leading;
+        matches.push({ type: "italic", index: absIdx, full: inner, c: inner });
+      }
+      matches.sort((a, b) => a.index - b.index);
+      if (!matches.length) { out.push({ type: "text", content: rem }); break; }
+      const m = matches[0]!;
+      if (m.index > 0) out.push({ type: "text", content: rem.slice(0, m.index) });
+      if (m.type === "image") out.push({ type: "image", content: m.c, href: m.href });
+      else if (m.type === "link") out.push({ type: "link", content: m.c, href: m.href });
+      else if (m.type === "bold") out.push({ type: "bold", content: m.c });
+      else if (m.type === "italic") out.push({ type: "italic", content: m.c });
+      rem = rem.slice(m.index + m.full.length);
     }
-    remaining = remaining.slice(earliest.index + earliest.match![0].length);
+    if (li < lines.length - 1) out.push({ type: "br", content: "" });
   }
+  return out;
+}
 
+function renderMarkdown(text: string) {
+  const parts = parseMarkdown(text);
   return (
     <>
       {parts.map((part, i) => {
+        if (part.type === "image") {
+          return (
+            <img
+              key={i}
+              src={part.href}
+              alt={part.content || "Clinical image"}
+              className="my-2 max-h-96 w-auto rounded-xl border border-slate-700/50 block"
+              loading="lazy"
+            />
+          );
+        }
         if (part.type === "link") {
           return (
-            <a
-              key={i}
-              href={part.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary-400 hover:text-primary-300 underline font-medium"
-            >
+            <a key={i} href={part.href} target="_blank" rel="noopener noreferrer"
+               className="text-primary-400 hover:text-primary-300 underline font-medium">
               {part.content}
             </a>
           );
@@ -472,26 +341,47 @@ function renderMarkdownContent(text: string) {
           return <strong key={i} className="font-semibold text-white">{part.content}</strong>;
         }
         if (part.type === "italic") {
-          return <em key={i} className="text-slate-400 italic">{part.content}</em>;
+          return <em key={i} className="text-slate-300 italic">{part.content}</em>;
         }
+        if (part.type === "heading") {
+          const size = part.level === 1 ? "text-lg" : part.level === 2 ? "text-base" : "text-sm";
+          return <strong key={i} className={`block ${size} font-bold text-white mt-2 mb-1`}>{part.content}</strong>;
+        }
+        if (part.type === "br") return <br key={i} />;
         return <span key={i}>{part.content}</span>;
       })}
     </>
   );
 }
 
+// ---------------------------------------------------------------------------
+
 const MODE_CARDS: Array<[ExaminerMode, string, string, string]> = [
-  ["examiner", "🎓 Mock Examiner", "Full ABO-style simulation. Neutral affect, curveballs, 3-domain scoring.", "from-rose-500 to-orange-500"],
-  ["viva", "🎤 Viva Voce", "Verbal-pressure simulation. ≤3 sentence answers enforced.", "from-rose-600 to-pink-600"],
-  ["quiz", "⚡ Rapid Quiz", "Rapid-fire questions with instant domain-tagged scoring.", "from-amber-500 to-yellow-500"],
-  ["ddx-drill", "🎯 DDx Drill", "'Give me 5 DDx for...' cycling through all subspecialties.", "from-fuchsia-500 to-purple-600"],
-  ["soap", "📋 SOAP Practice", "Write a SOAP note; AI critiques ruthlessly and shows the perfect one.", "from-cyan-500 to-blue-600"],
-  ["case-builder", "🧪 Case Builder", "AI generates novel boards-style cases tailored to your gap areas.", "from-teal-500 to-emerald-600"],
-  ["deep-dive", "📖 Deep Dive", "Structured subspecialty lecture with trials, pearls, fatal flaws.", "from-indigo-500 to-violet-600"],
-  ["pearls", "💎 Pearl Dump", "High-yield board pearls for cramming a topic fast.", "from-amber-400 to-orange-400"],
+  ["examiner", "🎓 Mock Examiner", "Full ABO-style simulation with a real case + curveballs + 3-domain scoring.", "from-rose-500 to-orange-500"],
+  ["viva", "🎤 Viva Voce", "Verbal pressure; ≤3 sentence answers enforced.", "from-rose-600 to-pink-600"],
+  ["quiz", "⚡ Rapid Quiz", "Rapid-fire questions; instant domain-tagged scoring.", "from-amber-500 to-yellow-500"],
+  ["ddx-drill", "🎯 DDx Drill", "'Give me 5 DDx for...' cycled across subspecialties.", "from-fuchsia-500 to-purple-600"],
+  ["soap", "📋 SOAP Practice", "Write a SOAP note; AI critiques & shows the ideal.", "from-cyan-500 to-blue-600"],
+  ["case-builder", "🧪 Case Builder", "AI generates novel cases tailored to your gaps.", "from-teal-500 to-emerald-600"],
+  ["deep-dive", "📖 Deep Dive", "Structured subspecialty lecture + trials + fatal flaws.", "from-indigo-500 to-violet-600"],
+  ["pearls", "💎 Pearl Dump", "Top 10-15 board pearls + fatal flaws + mnemonics.", "from-amber-400 to-orange-400"],
   ["tutor", "📚 Teaching Tutor", "Deep explanations with pearls, trials, mnemonics.", "from-emerald-500 to-teal-500"],
-  ["free-chat", "💬 Free Chat", "Open conversation about any ophth/exam-prep topic.", "from-primary-500 to-violet-500"],
+  ["free-chat", "💬 Free Chat", "Open discussion.", "from-primary-500 to-violet-500"],
 ];
+
+// Suggested opening prompts when user hasn't entered a subspecialty focus
+const AUTO_START_PROMPT: Record<ExaminerMode, string> = {
+  examiner: "Start the case. I'll walk through my approach.",
+  viva: "First question.",
+  quiz: "Start the quiz. First question.",
+  "ddx-drill": "First DDx prompt.",
+  soap: "Present the first SOAP-practice scenario.",
+  "case-builder": "Build a novel boards-style case.",
+  "deep-dive": "Begin with a high-yield topic and structured lecture.",
+  pearls: "Dump your top pearls for today's highest-yield topic.",
+  tutor: "What topic would you like me to cover? If unsure, start with something high-yield.",
+  "free-chat": "Hi! What's on your mind today?",
+};
 
 export default function AIExaminer({ database, onBack, initialCase }: AIExaminerProps) {
   const [mode, setMode] = useState<ExaminerMode>("examiner");
@@ -499,13 +389,24 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [hasContent, setHasContent] = useState(true);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [firstByteMs, setFirstByteMs] = useState<number | null>(null);
   const [currentCase, setCurrentCase] = useState<CaseData | null>(initialCase || null);
   const [subspecialtyFocus, setSubspecialtyFocus] = useState<string>("");
   const [error, setError] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // List of cases with images for Examiner mode random-pick
+  const casesWithImages = useMemo(
+    () =>
+      database.subspecialties
+        .flatMap((s) => s.cases)
+        .filter((c) => c.questions?.length > 0 && (c.imageFile || c.externalImageUrl)),
+    [database]
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -515,126 +416,141 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     if (started && inputRef.current) inputRef.current.focus();
   }, [started, isStreaming]);
 
-  // Cleanup any active stream on unmount
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => () => { abortRef.current?.abort(); if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current); }, []);
 
-  const startSession = useCallback(() => {
-    const systemMsg: Message = {
-      role: "system",
-      content: buildSystemPrompt(mode, database, currentCase, subspecialtyFocus || undefined),
-    };
-
-    let greeting = "";
-    switch (mode) {
-      case "examiner": {
-        const caseImageUrl = currentCase?.imageFile
-          ? `/images/${currentCase.imageFile}`
-          : currentCase?.externalImageUrl || null;
-        if (currentCase && caseImageUrl) {
-          greeting = `Let's begin.\n\n**Clinical Image:** [View Clinical Image](${caseImageUrl})\n\n${currentCase.presentation}\n\nPlease describe what you see.`;
-        } else if (currentCase) {
-          greeting = `Let's begin. ${currentCase.presentation}\n\nWhat's your first step?`;
-        } else {
-          greeting = "Welcome to your oral board simulation. I'll present cases across all 6 subspecialties just like the real ABO exam. Ready? Here's your first case...";
-        }
-        break;
-      }
-      case "viva":
-        greeting = "Viva voce. Short answers only. Here's your first question — fire back in ≤ 3 sentences.";
-        break;
-      case "tutor":
-        greeting = "I'm your ophthalmology tutor. Ask me about any topic — basic science, clinical cases, surgical decision-making, or exam strategy. I'll give you the board-level answer plus pearls.";
-        break;
-      case "quiz":
-        greeting = "Rapid-fire quiz mode. Here's question 1...";
-        break;
-      case "soap":
-        greeting = "SOAP-note practice. Here's the scenario — write a complete SOAP note and I'll critique it.";
-        break;
-      case "deep-dive":
-        greeting = subspecialtyFocus
-          ? `Deep-dive on ${subspecialtyFocus} — what specific topic do you want covered?`
-          : "Deep-dive lecture mode. What topic would you like me to cover?";
-        break;
-      case "case-builder":
-        greeting = "Case builder. Tell me: subspecialty + difficulty (easy/medium/hard) + (optional) a gap you want tested. I'll generate a novel boards-style case.";
-        break;
-      case "pearls":
-        greeting = "Pearl dump mode. Give me a topic and I'll fire back the top 10-15 board pearls, fatal flaws, key trials, and mnemonics.";
-        break;
-      case "ddx-drill":
-        greeting = "DDx drill. Here's prompt 1...";
-        break;
-      default:
-        greeting = "Hi! I'm your AI study companion. Ask anything about ophthalmology or exam prep.";
+  const startElapsed = () => {
+    const t0 = performance.now();
+    setElapsedMs(0);
+    setFirstByteMs(null);
+    if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+    elapsedTimerRef.current = setInterval(() => {
+      setElapsedMs(Math.round(performance.now() - t0));
+    }, 200);
+  };
+  const stopElapsed = () => {
+    if (elapsedTimerRef.current) {
+      clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
     }
+  };
 
-    const assistantMsg: Message = { role: "assistant", content: greeting };
-    setMessages([systemMsg, assistantMsg]);
-    setStarted(true);
-
-    // Auto-generate first question for modes that need it
-    if (["quiz", "ddx-drill"].includes(mode) || (mode === "examiner" && !currentCase)) {
-      const allMsgs = [systemMsg, assistantMsg, { role: "user" as const, content: "Start." }];
+  const streamAndAppend = useCallback(
+    async (updatedMessages: Message[]) => {
+      setError("");
       setIsStreaming(true);
-      setHasContent(false);
+      startElapsed();
+
+      abortRef.current?.abort();
       abortRef.current = new AbortController();
+
       let accumulated = "";
-      streamViaProxy(
-        allMsgs,
+      const placeholder: Message = { role: "assistant", content: "" };
+      setMessages([...updatedMessages, placeholder]);
+
+      let gotError = false;
+      await streamViaProxy(
+        updatedMessages,
         (chunk) => {
           accumulated += chunk;
-          if (accumulated.length > 0) setHasContent(true);
-          setMessages([systemMsg, assistantMsg, { role: "assistant", content: accumulated }]);
+          setMessages([...updatedMessages, { role: "assistant", content: accumulated }]);
+        },
+        (fbMs) => setFirstByteMs(fbMs),
+        (code, msg) => {
+          gotError = true;
+          setError(friendlyError(code, msg));
         },
         abortRef.current.signal
-      ).then((res) => {
-        if (!res.ok && res.errorCode) {
-          setError(friendlyError(res.errorCode, res.errorMessage || "", res.retryAfter));
-        }
-      }).finally(() => {
-        setIsStreaming(false);
-      });
+      );
+
+      // If no content streamed and no error shown, surface a generic hint
+      if (!gotError && !accumulated.trim()) {
+        setError("The AI didn't return any content. Try again or rephrase.");
+      }
+
+      setIsStreaming(false);
+      stopElapsed();
+    },
+    []
+  );
+
+  const startSession = useCallback(() => {
+    const sysPrompt = buildSystemPrompt(mode, currentCase, subspecialtyFocus || undefined);
+    const systemMsg: Message = { role: "system", content: sysPrompt };
+
+    // Pre-computed opening: for examiner mode, show the case IMMEDIATELY
+    // (image + presentation) before the AI takes over. This avoids any
+    // perceived "nothing is happening" during warm-up.
+    const assistantMsgs: Message[] = [];
+    let followUpPrompt = AUTO_START_PROMPT[mode];
+
+    if (mode === "examiner") {
+      const c = currentCase || pickRandomCaseWithImage(database);
+      if (c) {
+        setCurrentCase(c);
+        assistantMsgs.push({ role: "assistant", content: caseOpeningMessage(c) });
+        followUpPrompt =
+          "The candidate is now looking at the case. Wait for them to describe the image and their approach. When they speak, probe with progressive disclosure per examiner rules.";
+      } else {
+        assistantMsgs.push({
+          role: "assistant",
+          content: "**Welcome to your ABO oral board simulation.** I'll present a novel case. Ready?",
+        });
+      }
+    } else {
+      const greet: Record<ExaminerMode, string> = {
+        examiner: "",
+        viva: "**Viva voce.** Short answers only (≤3 sentences). First question in a second…",
+        quiz: "**Rapid-fire quiz.** First question incoming…",
+        "ddx-drill": "**DDx drill.** First prompt coming up…",
+        soap: "**SOAP-note practice.** First scenario loading…",
+        "case-builder": "**Case builder.** Generating a novel case now…",
+        "deep-dive": subspecialtyFocus
+          ? `**Deep dive: ${subspecialtyFocus}.** Starting with a high-yield topic…`
+          : "**Deep-dive lecture mode.** Picking a high-yield topic…",
+        pearls: subspecialtyFocus
+          ? `**Pearl dump: ${subspecialtyFocus}.** Compiling the top pearls…`
+          : "**Pearl dump.** Starting with a high-yield topic…",
+        tutor: "**Teaching tutor ready.** What topic would you like me to cover? Say a word and I'll start.",
+        "free-chat": "**Hi! I'm your AI study companion.** What's on your mind today?",
+      };
+      assistantMsgs.push({ role: "assistant", content: greet[mode] });
     }
-  }, [mode, database, currentCase, subspecialtyFocus]);
+
+    const initial = [systemMsg, ...assistantMsgs];
+    setMessages(initial);
+    setStarted(true);
+
+    // Auto-run the follow-up prompt for modes that should stream content
+    // immediately. Tutor/free-chat wait for user input.
+    if (mode !== "tutor" && mode !== "free-chat") {
+      void streamAndAppend([...initial, { role: "user", content: followUpPrompt }]);
+    }
+  }, [mode, currentCase, subspecialtyFocus, database, streamAndAppend]);
 
   const sendMessage = async () => {
     if (!input.trim() || isStreaming) return;
-    setError("");
-
     const userMsg: Message = { role: "user", content: input.trim() };
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+    const updated = [...messages, userMsg];
+    setMessages(updated);
     setInput("");
-    setIsStreaming(true);
-    setHasContent(false);
-
-    let accumulated = "";
-    const placeholderMsg: Message = { role: "assistant", content: "" };
-    setMessages([...updatedMessages, placeholderMsg]);
-
-    abortRef.current = new AbortController();
-    const res = await streamViaProxy(
-      updatedMessages,
-      (chunk) => {
-        accumulated += chunk;
-        if (accumulated.length > 0) setHasContent(true);
-        setMessages([...updatedMessages, { role: "assistant", content: accumulated }]);
-      },
-      abortRef.current.signal
-    );
-    if (!res.ok && res.errorCode) {
-      setError(friendlyError(res.errorCode, res.errorMessage || "", res.retryAfter));
-    }
-    setIsStreaming(false);
+    await streamAndAppend(updated);
   };
 
   const stopStreaming = () => {
     abortRef.current?.abort();
     setIsStreaming(false);
+    stopElapsed();
   };
 
-  // MODE SELECTION
+  const regenerateLast = async () => {
+    // Strip the last assistant message and re-stream
+    const prior = [...messages];
+    while (prior.length && prior[prior.length - 1].role !== "user") prior.pop();
+    if (prior.length === 0) return;
+    await streamAndAppend(prior);
+  };
+
+  // ─── MODE SELECTION ──────────────────────────────────────────────────
   if (!started) {
     return (
       <div className="min-h-screen">
@@ -663,7 +579,8 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               </div>
               <h2 className="text-2xl font-bold text-white mb-1">AI Examiner & Tutor</h2>
               <p className="text-sm text-slate-400">
-                Powered by Kimi K2.6 · 256K context · grounded in 25 fatal-flaw safety nets
+                Grounded in 27 fatal-flaw safety nets, 46 landmark trials, 25 AAO PPPs.
+                Cites briefly; explains WHY+HOW; ends with 2-3 pearls.
               </p>
             </div>
 
@@ -686,7 +603,6 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               ))}
             </div>
 
-            {/* Optional: subspecialty focus (for deep-dive, case-builder, ddx-drill) */}
             {["deep-dive", "case-builder", "ddx-drill", "pearls", "quiz"].includes(mode) && (
               <div className="mb-5 animate-fade-in">
                 <label className="text-xs text-slate-400 uppercase tracking-wider mb-2 block">
@@ -705,38 +621,34 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               </div>
             )}
 
-            {/* Optional: pick a specific case for examiner mode */}
             {mode === "examiner" && (
               <div className="mb-5">
                 <label className="text-xs text-slate-400 uppercase tracking-wider mb-2 block">
-                  Case (optional)
+                  Case (optional — random if blank; only cases with images)
                 </label>
                 <select
                   value={currentCase?.id || ""}
                   onChange={(e) => {
-                    if (!e.target.value) {
-                      setCurrentCase(null);
-                      return;
-                    }
-                    const found = database.subspecialties
-                      .flatMap((s) => s.cases)
-                      .find((c) => c.id === e.target.value);
+                    if (!e.target.value) { setCurrentCase(null); return; }
+                    const found = casesWithImages.find((c) => c.id === e.target.value);
                     setCurrentCase(found || null);
                   }}
                   className="w-full px-3 py-2.5 rounded-lg bg-slate-800/50 text-sm text-slate-300 border border-slate-700/50 min-h-[44px]"
                 >
-                  <option value="">Random cases</option>
-                  {database.subspecialties.map((s) => (
-                    <optgroup key={s.id} label={s.name}>
-                      {s.cases
-                        .filter((c) => c.questions.length > 0)
-                        .map((c) => (
+                  <option value="">Random case (with image)</option>
+                  {database.subspecialties.map((s) => {
+                    const list = s.cases.filter((c) => c.questions?.length > 0 && (c.imageFile || c.externalImageUrl));
+                    if (!list.length) return null;
+                    return (
+                      <optgroup key={s.id} label={s.name}>
+                        {list.map((c) => (
                           <option key={c.id} value={c.id}>
                             #{c.caseNumber} {c.title}
                           </option>
                         ))}
-                    </optgroup>
-                  ))}
+                      </optgroup>
+                    );
+                  })}
                 </select>
               </div>
             )}
@@ -748,7 +660,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               Start Session
             </button>
             <p className="text-[11px] text-slate-500 text-center mt-3">
-              Server-side AI — no API key setup needed. Your prompts and messages stay private.
+              Server-side AI — no setup needed. Primary model: gpt-oss:120b (fast).
             </p>
           </div>
         </div>
@@ -756,7 +668,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     );
   }
 
-  // CHAT INTERFACE
+  // ─── CHAT INTERFACE ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col">
       <div className="glass-card sticky top-0 z-50 border-b border-slate-700/50">
@@ -792,37 +704,34 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
           {messages
             .filter((m) => m.role !== "system")
             .map((msg, i) => {
-              const isLast = i === messages.filter((m) => m.role !== "system").length - 1;
-              const showShimmer =
-                isStreaming && !hasContent && isLast && msg.role === "assistant" && !msg.content;
+              const isUser = msg.role === "user";
+              const isPlaceholder = !isUser && !msg.content && isStreaming && i === messages.filter((m) => m.role !== "system").length - 1;
               return (
-                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[88%] rounded-2xl px-4 py-3 ${
-                      msg.role === "user"
+                    className={`max-w-[92%] rounded-2xl px-4 py-3 ${
+                      isUser
                         ? "bg-primary-600 text-white"
                         : "glass-card-light text-slate-100"
                     }`}
                   >
-                    {showShimmer ? (
-                      <div className="flex items-center gap-2 text-sm text-slate-400" aria-live="polite">
-                        <span
-                          className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse"
-                          aria-hidden
-                        />
-                        <span className="bg-gradient-to-r from-slate-400 via-white to-slate-400 bg-[length:200%_100%] bg-clip-text text-transparent animate-[shimmer_1.8s_linear_infinite]">
-                          Kimi is reasoning…
+                    {isPlaceholder ? (
+                      <div className="flex items-center gap-2 text-slate-400 text-sm">
+                        <span className="inline-block w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
+                        <span>
+                          {firstByteMs == null
+                            ? `AI is reasoning${elapsedMs >= 1000 ? ` · ${(elapsedMs / 1000).toFixed(1)}s` : "…"}`
+                            : `Streaming · ${((elapsedMs - firstByteMs) / 1000).toFixed(1)}s`}
                         </span>
                       </div>
                     ) : (
                       <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">
-                        {renderMarkdownContent(msg.content || "")}
+                        {renderMarkdown(msg.content)}
                       </div>
                     )}
                   </div>
@@ -831,8 +740,15 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
             })}
           {error && (
             <div className="flex justify-start">
-              <div className="max-w-[88%] rounded-2xl px-4 py-3 bg-rose-500/10 border border-rose-500/40 text-rose-200 text-sm">
+              <div className="max-w-[92%] rounded-2xl px-4 py-3 bg-rose-500/10 border border-rose-500/40 text-rose-200 text-sm">
                 {error}
+                <button
+                  onClick={regenerateLast}
+                  disabled={isStreaming}
+                  className="mt-2 text-xs underline hover:text-rose-100 block"
+                >
+                  Retry
+                </button>
               </div>
             </div>
           )}
@@ -840,7 +756,6 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
         </div>
       </div>
 
-      {/* Input */}
       <div className="glass-card border-t border-slate-700/50">
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex gap-2 items-end">
@@ -851,10 +766,10 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  sendMessage();
+                  void sendMessage();
                 }
               }}
-              placeholder={isStreaming ? "AI is responding..." : "Type your answer... (Enter to send, Shift+Enter for newline)"}
+              placeholder={isStreaming ? "AI is responding — press Stop to interrupt" : "Answer or ask anything… (Enter to send, Shift+Enter newline)"}
               disabled={isStreaming}
               rows={1}
               className="flex-1 resize-none px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-700/50 text-white text-sm placeholder-slate-500 focus:border-primary-500/50 min-h-[44px] max-h-40"

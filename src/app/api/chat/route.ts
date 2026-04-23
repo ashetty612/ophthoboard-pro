@@ -3,22 +3,33 @@ import { logEvent } from "@/lib/telemetry";
 import { buildRelevantContext } from "@/lib/ai-context";
 
 /**
- * Ollama Cloud chat proxy (Kimi K2.6 primary, gpt-oss fallback).
- * NDJSON -> OpenAI-style SSE. Retry-with-jitter on 429/5xx (not 400/401/403/404).
- * Per-IP token-bucket rate limit (30 req/min). 55s upstream timeout.
- * Structured error codes: auth | rate_limited | timeout | model | network | bad_request | config | upstream.
+ * Ollama Cloud chat proxy.
+ *
+ * Primary: gpt-oss:120b — fast (sub-5s first token), strong clinical reasoning.
+ * Optional: kimi-k2.6:cloud — deep thinking, 256K context, slower (~30-60s).
+ *   Enable with body.deep_thinking === true (not wired by default).
+ * Fallback: gpt-oss:20b — cheaper fallback if 120b is rate-limited.
+ *
+ * Streams NDJSON -> OpenAI-style SSE and emits heartbeat comments every
+ * 5s while upstream is silent, so Vercel's edge doesn't buffer and the
+ * client can show live progress.
  */
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "https://ollama.com";
-const PRIMARY_MODEL = process.env.OLLAMA_MODEL || "kimi-k2.6:cloud";
-const FALLBACK_MODEL = process.env.OLLAMA_FALLBACK_MODEL || "gpt-oss:120b";
+const DEFAULT_PRIMARY = "gpt-oss:120b";
+const DEFAULT_FALLBACK = "gpt-oss:20b";
+const DEEP_MODEL = "kimi-k2.6:cloud";
+
+const PRIMARY_MODEL = process.env.OLLAMA_MODEL || DEFAULT_PRIMARY;
+const FALLBACK_MODEL = process.env.OLLAMA_FALLBACK_MODEL || DEFAULT_FALLBACK;
 
 const RATE_MAX = 30;
 const RATE_WINDOW_MS = 60_000;
-const TIMEOUT_MS = 55_000;
+const TIMEOUT_MS = 85_000; // slightly under Vercel maxDuration 90s
+const HEARTBEAT_MS = 5_000;
 const MAX_RETRIES = 2;
 const NON_RETRYABLE = new Set([400, 401, 403, 404]);
 
@@ -30,7 +41,6 @@ const buckets = new Map<string, Bucket>();
 let lastCleanup = Date.now();
 
 function getClientIp(req: NextRequest): string {
-  // Next.js 15 removed `request.ip`; prefer x-forwarded-for (first hop), then x-real-ip.
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0]!.trim();
   return req.headers.get("x-real-ip")?.trim() || "unknown";
@@ -58,6 +68,7 @@ const sseEncode = (text: string) =>
   enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
 const sseError = (code: string, message: string) =>
   enc.encode(`data: ${JSON.stringify({ error: { code, message } })}\n\n`);
+const sseHeartbeat = () => enc.encode(`: heartbeat\n\n`);
 const sseDone = () => enc.encode("data: [DONE]\n\n");
 
 // --- Upstream fetch with retry-with-jitter -------------------------------
@@ -104,7 +115,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { messages?: IncomingMessage[]; think?: boolean; temperature?: number } = {};
+  let body: {
+    messages?: IncomingMessage[];
+    think?: boolean;
+    temperature?: number;
+    deep_thinking?: boolean;
+  } = {};
   try { body = await request.json(); }
   catch {
     return Response.json({ error: { code: "bad_request", message: "Invalid JSON body." } }, { status: 400 });
@@ -120,27 +136,26 @@ export async function POST(request: NextRequest) {
     content: (m.content || "").toString().slice(0, 20000),
   }));
 
-  // Retrieval: ground the model in curated board-relevant references. Scan
-  // the last user message; if curated snippets match, prepend a compact
-  // SYSTEM message so the model reasons from cited data. Silent no-op
-  // otherwise.
+  // Retrieval: ground the model in curated board-relevant references.
   const lastUser = [...normalized].reverse().find((m) => m.role === "user");
   if (lastUser && lastUser.content) {
     const ctxBlock = buildRelevantContext(lastUser.content);
     if (ctxBlock) {
       normalized.unshift({
         role: "system",
-        content:
-          "RELEVANT REFERENCE MATERIAL (curated — trust over general knowledge):\n" +
-          ctxBlock,
+        content: "RELEVANT REFERENCES (trust these over general knowledge):\n" + ctxBlock,
       });
     }
   }
 
   const showThinking = body.think === true;
-  const temperature = typeof body.temperature === "number" ? body.temperature : 0.5;
+  const temperature = typeof body.temperature === "number" ? body.temperature : 0.4;
 
-  const models = [PRIMARY_MODEL, FALLBACK_MODEL];
+  // Model cascade: caller can opt into deep reasoning with Kimi, but by
+  // default we use gpt-oss:120b for speed. Fallback to gpt-oss:20b.
+  const primary = body.deep_thinking ? DEEP_MODEL : PRIMARY_MODEL;
+  const fallback = body.deep_thinking ? PRIMARY_MODEL : FALLBACK_MODEL;
+  const models = [primary, fallback];
   let lastError = "";
 
   for (let i = 0; i < models.length; i++) {
@@ -152,7 +167,12 @@ export async function POST(request: NextRequest) {
       const upstream = await fetchWithRetry(`${OLLAMA_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages: normalized, stream: true, options: { temperature } }),
+        body: JSON.stringify({
+          model,
+          messages: normalized,
+          stream: true,
+          options: { temperature },
+        }),
         signal: controller.signal,
       });
 
@@ -167,13 +187,37 @@ export async function POST(request: NextRequest) {
       }
 
       const usedFallback = i > 0;
+      let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
       const readable = new ReadableStream({
         async start(ctrl) {
-          if (usedFallback) ctrl.enqueue(sseEncode(`_(Using ${model} fallback)_\n\n`));
+          // Emit an initial byte IMMEDIATELY so the client opens its reader
+          // and browser/CDN doesn't buffer. This is critical for perceived
+          // responsiveness — without it, no bytes flow for 5-10s while the
+          // model "thinks," and some edge proxies buffer the whole stream.
+          try {
+            ctrl.enqueue(sseHeartbeat());
+          } catch { /* ignore */ }
+
+          if (usedFallback) {
+            try { ctrl.enqueue(sseEncode(`_(Using ${model} fallback)_\n\n`)); } catch { /* ignore */ }
+          }
+
+          // Heartbeat: every HEARTBEAT_MS, emit an SSE comment if we haven't
+          // flushed anything recently. Keeps the connection alive and
+          // prevents edge-layer buffering.
+          let lastFlushAt = Date.now();
+          heartbeatTimer = setInterval(() => {
+            if (Date.now() - lastFlushAt >= HEARTBEAT_MS) {
+              try { ctrl.enqueue(sseHeartbeat()); } catch { /* ignore */ }
+            }
+          }, HEARTBEAT_MS);
+
           const reader = upstream.body!.getReader();
           const decoder = new TextDecoder();
           let buffer = "";
           let sawContent = false;
+
           try {
             while (true) {
               const { done, value } = await reader.read();
@@ -191,11 +235,26 @@ export async function POST(request: NextRequest) {
                     done?: boolean;
                     error?: string;
                   };
-                  if (obj.error) { ctrl.enqueue(sseError("model", obj.error)); continue; }
+                  if (obj.error) {
+                    ctrl.enqueue(sseError("model", obj.error));
+                    lastFlushAt = Date.now();
+                    continue;
+                  }
                   const content = obj.message?.content || "";
                   const thinking = obj.message?.thinking || "";
-                  if (content) { sawContent = true; ctrl.enqueue(sseEncode(content)); }
-                  else if (thinking && showThinking) ctrl.enqueue(sseEncode("\u200b"));
+                  if (content) {
+                    sawContent = true;
+                    ctrl.enqueue(sseEncode(content));
+                    lastFlushAt = Date.now();
+                  } else if (thinking && showThinking) {
+                    // Forward thinking tokens as small visible progress
+                    ctrl.enqueue(sseEncode("\u200b"));
+                    lastFlushAt = Date.now();
+                  } else if (thinking) {
+                    // Silent heartbeat to keep the connection warm during long think
+                    ctrl.enqueue(sseHeartbeat());
+                    lastFlushAt = Date.now();
+                  }
                   if (obj.done) break;
                 } catch { /* skip malformed */ }
               }
@@ -210,6 +269,7 @@ export async function POST(request: NextRequest) {
             ));
             ctrl.enqueue(sseDone());
           } finally {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
             clearTimeout(timeoutId);
             ctrl.close();
           }
