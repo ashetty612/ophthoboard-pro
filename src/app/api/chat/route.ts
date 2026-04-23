@@ -191,25 +191,25 @@ export async function POST(request: NextRequest) {
 
       const readable = new ReadableStream({
         async start(ctrl) {
-          // Emit an initial byte IMMEDIATELY so the client opens its reader
-          // and browser/CDN doesn't buffer. This is critical for perceived
-          // responsiveness — without it, no bytes flow for 5-10s while the
-          // model "thinks," and some edge proxies buffer the whole stream.
-          try {
-            ctrl.enqueue(sseHeartbeat());
-          } catch { /* ignore */ }
+          // Single initial heartbeat so the client opens its reader and
+          // edge proxies see activity immediately. Do NOT spam heartbeats
+          // per thinking token — that fills the TCP/HTTP/2 buffer and
+          // delays the real content chunks from reaching the client.
+          try { ctrl.enqueue(sseHeartbeat()); } catch { /* ignore */ }
 
           if (usedFallback) {
             try { ctrl.enqueue(sseEncode(`_(Using ${model} fallback)_\n\n`)); } catch { /* ignore */ }
           }
 
-          // Heartbeat: every HEARTBEAT_MS, emit an SSE comment if we haven't
-          // flushed anything recently. Keeps the connection alive and
-          // prevents edge-layer buffering.
+          // Scheduled heartbeat only when NO data has flushed for HEARTBEAT_MS.
+          // This is the only anti-idle mechanism — don't duplicate it elsewhere.
           let lastFlushAt = Date.now();
           heartbeatTimer = setInterval(() => {
             if (Date.now() - lastFlushAt >= HEARTBEAT_MS) {
-              try { ctrl.enqueue(sseHeartbeat()); } catch { /* ignore */ }
+              try {
+                ctrl.enqueue(sseHeartbeat());
+                lastFlushAt = Date.now();
+              } catch { /* ignore */ }
             }
           }, HEARTBEAT_MS);
 
@@ -241,18 +241,14 @@ export async function POST(request: NextRequest) {
                     continue;
                   }
                   const content = obj.message?.content || "";
-                  const thinking = obj.message?.thinking || "";
+                  // Thinking tokens are INTENTIONALLY dropped unless showThinking
+                  // is requested. The scheduled heartbeat handles idle periods.
                   if (content) {
                     sawContent = true;
                     ctrl.enqueue(sseEncode(content));
                     lastFlushAt = Date.now();
-                  } else if (thinking && showThinking) {
-                    // Forward thinking tokens as small visible progress
-                    ctrl.enqueue(sseEncode("\u200b"));
-                    lastFlushAt = Date.now();
-                  } else if (thinking) {
-                    // Silent heartbeat to keep the connection warm during long think
-                    ctrl.enqueue(sseHeartbeat());
+                  } else if (showThinking && obj.message?.thinking) {
+                    ctrl.enqueue(sseEncode(`\u200b`));
                     lastFlushAt = Date.now();
                   }
                   if (obj.done) break;
