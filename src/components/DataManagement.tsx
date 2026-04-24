@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { exportUserData, importUserData, clearAllUserData, type ExportBundle } from "@/lib/export";
 import { logError } from "@/lib/telemetry";
+import OnboardingTour, { resetOnboardingFlag } from "@/components/OnboardingTour";
 
 interface Stats {
   attempts: number;
@@ -30,6 +31,7 @@ export default function DataManagement({ onBack }: Props) {
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [pendingImport, setPendingImport] = useState<ExportBundle | null>(null);
+  const [tourToken, setTourToken] = useState<number | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refreshStats = useCallback(() => {
@@ -197,6 +199,22 @@ export default function DataManagement({ onBack }: Props) {
         )}
       </section>
 
+      <section className="glass-card rounded-xl p-5 mb-6">
+        <h2 className="text-sm font-semibold text-white mb-1">Onboarding tour</h2>
+        <p className="text-xs text-slate-400 mb-3">
+          Re-run the 60-second first-time tour. Clears the completed flag and opens the tour immediately.
+        </p>
+        <button
+          onClick={() => {
+            resetOnboardingFlag();
+            setTourToken(Date.now());
+          }}
+          className="px-4 py-2 rounded-xl bg-steel-500 hover:bg-steel-600 text-white text-sm font-medium transition-colors"
+        >
+          Re-run tour
+        </button>
+      </section>
+
       <section className="glass-card rounded-xl p-5 mb-6 border border-rose-500/20">
         <h2 className="text-sm font-semibold text-white mb-1">Reset all data</h2>
         <p className="text-xs text-slate-400 mb-3">
@@ -227,6 +245,8 @@ export default function DataManagement({ onBack }: Props) {
           </div>
         )}
       </section>
+
+      <OnboardingTour enabled={false} forceRunToken={tourToken} />
     </div>
   );
 }

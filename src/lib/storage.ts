@@ -97,30 +97,37 @@ function updateProgress(attempts: CaseAttempt[]): void {
 
   const bySubspecialty: StudyProgress['bySubspecialty'] = {};
 
+  // Group attempts by subspecialty name so we scan the list once (previously O(N²)).
+  // Multiple prefixes can map to the same specName (e.g. 'po' and 'ped' →
+  // "Pediatric Ophthalmology"), so we merge them into a single bucket.
+  const caseIdsBySpec: Record<string, Set<string>> = {};
+  const scoreSumBySpec: Record<string, { sum: number; count: number }> = {};
+  const lastAttemptBySpec: Record<string, string> = {};
   for (const attempt of attempts) {
-    const subspecialty = attempt.caseId.split('-').slice(0, -1).join('-');
-    const specName = getSubspecialtyName(subspecialty);
-
-    if (!bySubspecialty[specName]) {
-      bySubspecialty[specName] = {
-        attempted: 0,
-        total: getSubspecialtyTotal(specName),
-        averageScore: 0,
-        lastAttempt: attempt.timestamp,
-      };
+    const prefix = attempt.caseId.split('-').slice(0, -1).join('-');
+    const specName = getSubspecialtyName(prefix);
+    if (!caseIdsBySpec[specName]) {
+      caseIdsBySpec[specName] = new Set();
+      scoreSumBySpec[specName] = { sum: 0, count: 0 };
+      lastAttemptBySpec[specName] = attempt.timestamp;
     }
-
-    bySubspecialty[specName].attempted = new Set(
-      attempts.filter(a => a.caseId.startsWith(subspecialty)).map(a => a.caseId)
-    ).size;
-
-    const specScores = attempts
-      .filter(a => a.caseId.startsWith(subspecialty))
-      .map(a => a.percentageScore)
-      .filter(s => typeof s === 'number' && !isNaN(s));
-    bySubspecialty[specName].averageScore =
-      specScores.length > 0 ? Math.round(specScores.reduce((a, b) => a + b, 0) / specScores.length) : 0;
-    bySubspecialty[specName].lastAttempt = attempt.timestamp;
+    caseIdsBySpec[specName].add(attempt.caseId);
+    if (typeof attempt.percentageScore === 'number' && !isNaN(attempt.percentageScore)) {
+      scoreSumBySpec[specName].sum += attempt.percentageScore;
+      scoreSumBySpec[specName].count += 1;
+    }
+    if (attempt.timestamp > lastAttemptBySpec[specName]) {
+      lastAttemptBySpec[specName] = attempt.timestamp;
+    }
+  }
+  for (const specName of Object.keys(caseIdsBySpec)) {
+    const { sum, count } = scoreSumBySpec[specName];
+    bySubspecialty[specName] = {
+      attempted: caseIdsBySpec[specName].size,
+      total: getSubspecialtyTotal(specName),
+      averageScore: count > 0 ? Math.round(sum / count) : 0,
+      lastAttempt: lastAttemptBySpec[specName],
+    };
   }
 
   const weakAreas: string[] = [];

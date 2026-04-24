@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { CaseData, UserAnswer, CaseAttempt } from "@/lib/types";
 import {
   scoreAnswer,
@@ -44,12 +44,22 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   const [imageLoadError, setImageLoadError] = useState(false);
   const [srsRated, setSrsRated] = useState<{ rating: Rating; intervalDays: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const previousAttempts = getAttemptsForCase(caseData.id);
-  const pearls = getPearlsForCase(caseData.subspecialty, caseData.title);
-  const fatalFlaws = getFatalFlawsForCase(
-    caseData.diagnosisTitle || "",
-    caseData.title || "",
-    caseData.questions?.flatMap((q) => q.scoringKeywords || []) ?? []
+  // Memoize derived lookups so they only recompute when the case changes.
+  // `previousAttempts` reads from localStorage; `getFatalFlawsForCase` walks the
+  // full fatal-flaw registry — neither should run on every keystroke.
+  const previousAttempts = useMemo(() => getAttemptsForCase(caseData.id), [caseData.id]);
+  const pearls = useMemo(
+    () => getPearlsForCase(caseData.subspecialty, caseData.title),
+    [caseData.subspecialty, caseData.title]
+  );
+  const fatalFlaws = useMemo(
+    () =>
+      getFatalFlawsForCase(
+        caseData.diagnosisTitle || "",
+        caseData.title || "",
+        caseData.questions?.flatMap((q) => q.scoringKeywords || []) ?? []
+      ),
+    [caseData.diagnosisTitle, caseData.title, caseData.questions]
   );
 
   useEffect(() => {

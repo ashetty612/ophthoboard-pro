@@ -4,9 +4,9 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { CasesDatabase, CaseData } from "@/lib/types";
 
 /**
- * AI Examiner — powered by gpt-oss:120b (fast) via Ollama Cloud.
- * Kimi K2.6 (deep reasoning) available as an opt-in model.
- * API key server-side only; client never sees it.
+ * AI Examiner — powered by Gemini 3 Flash Preview (primary) via Google
+ * Generative Language API, with Ollama Cloud (Kimi K2.6 / gpt-oss:120b)
+ * as server-side fallback. API keys are server-side only; client never sees them.
  *
  * Fixes applied after debugging session:
  *   - Slim system prompts (~600 tokens, was ~7000). Fatal flaws injected
@@ -660,7 +660,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               Start Session
             </button>
             <p className="text-[11px] text-slate-500 text-center mt-3">
-              Server-side AI — no setup needed. Primary model: gpt-oss:120b (fast).
+              Server-side AI — no setup needed. Primary: Gemini 3 Flash (Ollama fallback).
             </p>
           </div>
         </div>
@@ -706,11 +706,11 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-          {messages
-            .filter((m) => m.role !== "system")
-            .map((msg, i) => {
+          {(() => {
+            const visibleMessages = messages.filter((m) => m.role !== "system");
+            return visibleMessages.map((msg, i) => {
               const isUser = msg.role === "user";
-              const isPlaceholder = !isUser && !msg.content && isStreaming && i === messages.filter((m) => m.role !== "system").length - 1;
+              const isPlaceholder = !isUser && !msg.content && isStreaming && i === visibleMessages.length - 1;
               return (
                 <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                   <div
@@ -737,7 +737,8 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
                   </div>
                 </div>
               );
-            })}
+            });
+          })()}
           {error && (
             <div className="flex justify-start">
               <div className="max-w-[92%] rounded-2xl px-4 py-3 bg-rose-500/10 border border-rose-500/40 text-rose-200 text-sm">

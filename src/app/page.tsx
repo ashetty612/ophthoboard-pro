@@ -8,9 +8,11 @@ import Dashboard from "@/components/Dashboard";
 import SubspecialtyBrowser from "@/components/SubspecialtyBrowser";
 import ReviewMode from "@/components/ReviewMode";
 import ExamMode from "@/components/ExamMode";
+import PairedTopicExam from "@/components/PairedTopicExam";
 import FlashcardMode from "@/components/FlashcardMode";
 import AIExaminer from "@/components/AIExaminer";
 import PPPBrowser from "@/components/PPPBrowser";
+import AuthButton from "@/components/AuthButton";
 import CramSheet from "@/components/CramSheet";
 import DueTodayView from "@/components/DueTodayView";
 import RapidFireDrill from "@/components/RapidFireDrill";
@@ -19,12 +21,16 @@ import KeyboardShortcutsOverlay from "@/components/KeyboardShortcutsOverlay";
 import DataManagement from "@/components/DataManagement";
 import UserFlashcards from "@/components/UserFlashcards";
 import QBankView from "@/components/QBankView";
+import OnboardingTour from "@/components/OnboardingTour";
+import EmphHeading from "@/components/EmphHeading";
 import { getDueCards, getOverdueCount } from "@/lib/srs";
 import { analyzeWeaknesses } from "@/lib/weakness-quiz";
 import { getAttempts } from "@/lib/storage";
 import { useGlobalKeyboard, type GlobalView } from "@/lib/use-global-keyboard";
+import HeatmapView from "@/components/HeatmapView";
+import { computeHeatmap, axisLabel, type HeatmapCell } from "@/lib/heatmap";
 
-type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "flashcards" | "ai-examiner" | "ppp" | "cram" | "due-today" | "rapid-fire" | "weakness-quiz" | "settings" | "user-flashcards" | "qbank";
+type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "paired-exam" | "flashcards" | "ai-examiner" | "ppp" | "cram" | "due-today" | "rapid-fire" | "weakness-quiz" | "heatmap" | "settings" | "user-flashcards" | "qbank";
 
 // Custom SVG eye logo
 function EyeLogo({ size = 40 }: { size?: number }) {
@@ -300,6 +306,15 @@ export default function Home() {
       <ExamMode
         database={database}
         onBack={() => { setCurrentView("home"); scrollToTop(); }}
+      />
+    );
+  }
+
+  if (currentView === "paired-exam") {
+    return (
+      <PairedTopicExam
+        database={database}
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
         onSelectCase={handleSelectCase}
       />
     );
@@ -404,6 +419,16 @@ export default function Home() {
     );
   }
 
+  if (currentView === "heatmap") {
+    return (
+      <HeatmapView
+        database={database}
+        onBack={() => { setCurrentView("home"); scrollToTop(); }}
+        onStartCase={handleSelectCase}
+      />
+    );
+  }
+
   // Home View
   const totalActiveCases = database.subspecialties.reduce(
     (sum, s) => sum + s.cases.filter((c) => c.questions.length > 0).length,
@@ -432,6 +457,17 @@ export default function Home() {
     if (!spec) return null;
     const eligible = spec.cases.filter((c) => c.questions.length > 0);
     return eligible[Math.floor(Math.random() * eligible.length)] || null;
+  })();
+
+  // Heatmap teaser: surface the single weakest (subspecialty × axis) cell so the
+  // user can click straight into a targeted drill from home.
+  const heatmapWeakestCell: HeatmapCell | null = (() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return computeHeatmap().weakestCell;
+    } catch {
+      return null;
+    }
   })();
 
   const isFirstTime = progress.totalCasesAttempted === 0;
@@ -463,6 +499,7 @@ export default function Home() {
                 {item.label}
               </button>
             ))}
+            <AuthButton />
           </nav>
         </div>
       </header>
@@ -515,6 +552,7 @@ export default function Home() {
               <button
                 onClick={() => {
                   const all = database.subspecialties.flatMap((s) => s.cases.filter((c) => c.questions.length > 0));
+                  if (all.length === 0) return;
                   handleSelectCase(all[Math.floor(Math.random() * all.length)]);
                 }}
                 className="text-left rounded-xl p-3 bg-slate-900/60 border border-slate-700/50 hover:border-primary-500/50 transition-colors"
@@ -595,10 +633,13 @@ export default function Home() {
             <p className="text-[11px] text-primary-400/80 uppercase tracking-[0.3em] font-medium mb-4">
               Board Preparation Platform
             </p>
-            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4 tracking-tight leading-tight">
-              Master Your<br />
-              <span className="gradient-text">Oral Boards</span>
-            </h2>
+            <EmphHeading
+              level={2}
+              className="text-4xl sm:text-5xl font-bold text-white mb-4 tracking-tight leading-tight"
+            >
+              Master your <br />
+              <em>Oral Boards</em>
+            </EmphHeading>
             <p className="text-slate-400 text-base max-w-lg mx-auto leading-relaxed">
               {totalActiveCases} interactive cases across 5 subspecialties.
               ABO-style scoring, AI examiner, and detailed progress tracking.
@@ -653,11 +694,31 @@ export default function Home() {
             </div>
             <button
               onClick={() => handleSelectCase(weakestCase)}
-              className="shrink-0 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold transition-colors"
+              className="btn-pill btn-pill-primary text-sm shrink-0"
             >
               Start a {weakestHint} case →
             </button>
           </div>
+        )}
+
+        {/* Heatmap Teaser */}
+        {!isFirstTime && heatmapWeakestCell && !searchQuery && (
+          <button
+            onClick={() => setCurrentView("heatmap")}
+            className="mb-10 w-full rounded-xl border border-[color:var(--color-primary-500)]/30 bg-gradient-to-r from-[color:var(--color-primary-500)]/10 to-[color:var(--color-steel-500)]/10 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left hover-lift animate-fade-in-up"
+            aria-label="Open Performance Heatmap"
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-2xl mt-0.5" aria-hidden>📊</span>
+              <div>
+                <p className="text-[11px] text-primary-300 uppercase tracking-wider font-semibold">Performance Heatmap</p>
+                <p className="text-sm text-white font-medium mt-0.5">
+                  Your weakest axis: <span className="text-primary-300">{axisLabel(heatmapWeakestCell.axis).toUpperCase()}</span> in {heatmapWeakestCell.subspecialty} — <span className="text-rose-300">{heatmapWeakestCell.averagePercent}%</span>
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 text-xs text-primary-300 uppercase tracking-wider font-semibold">Open heatmap →</span>
+          </button>
         )}
 
         {/* Search Bar */}
@@ -726,7 +787,7 @@ export default function Home() {
               <h3 className="text-xs text-slate-400 uppercase tracking-[0.2em] font-medium">Subspecialties</h3>
               <span className="text-xs text-slate-400">{totalActiveCases} total cases</span>
             </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-14">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-14" data-tour="subspecialties">
               {database.subspecialties.map((spec, i) => {
                 const activeCases = spec.cases.filter((c) => c.questions.length > 0).length;
                 const meta = subspecialtyMeta[spec.id] || { icon: "📚", color: "from-slate-500 to-slate-700", accent: "border-l-slate-500" };
@@ -786,6 +847,7 @@ export default function Home() {
               </h3>
               <button
                 onClick={() => setExamWeekMode(!examWeekMode)}
+                data-tour="exam-week"
                 className={`text-[11px] px-3 py-1.5 rounded-full border transition-colors ${examWeekMode ? "bg-rose-500/20 border-rose-500/40 text-rose-200" : "bg-slate-800/60 border-slate-700/50 text-slate-400 hover:text-white"}`}
                 aria-pressed={examWeekMode}
                 aria-label="Toggle Exam-Week Mode"
@@ -821,10 +883,22 @@ export default function Home() {
                   highYield: true,
                 },
                 {
+                  label: "📊 Performance Heatmap",
+                  desc: heatmapWeakestCell
+                    ? `Weakest: ${axisLabel(heatmapWeakestCell.axis)} in ${heatmapWeakestCell.subspecialty} (${heatmapWeakestCell.averagePercent}%)`
+                    : "Subspecialty × ABO-axis breakdown",
+                  icon: "📊",
+                  iconBg: "bg-[color:var(--color-primary-500)]/15 text-primary-300",
+                  border: "border-[color:var(--color-primary-500)]/30",
+                  action: () => setCurrentView("heatmap"),
+                  highYield: true,
+                },
+                {
                   label: "Random Case", desc: "Jump into a surprise case", icon: "🎲",
                   iconBg: "bg-emerald-500/10 text-emerald-400", border: "",
                   action: () => {
                     const allCases = database.subspecialties.flatMap((s) => s.cases.filter((c) => c.questions.length > 0));
+                    if (allCases.length === 0) return;
                     handleSelectCase(allCases[Math.floor(Math.random() * allCases.length)]);
                   },
                   highYield: false,
@@ -834,6 +908,16 @@ export default function Home() {
                   iconBg: "bg-amber-500/10 text-amber-400", border: "border-amber-500/15",
                   action: () => setCurrentView("exam"),
                   highYield: false,
+                  tour: "exam",
+                },
+                {
+                  label: "🏛️ Paired-Topic Mock Exam",
+                  desc: "Authentic ABO room format — 2 examiners, 14 cases, 50 min",
+                  icon: "🏛️",
+                  iconBg: "bg-emerald-500/10 text-emerald-400",
+                  border: "border-emerald-500/15",
+                  action: () => setCurrentView("paired-exam"),
+                  highYield: true,
                 },
                 {
                   label: "Quick Review", desc: "Browse answers without scoring", icon: "📋",
@@ -858,12 +942,14 @@ export default function Home() {
                   iconBg: "bg-amber-500/10 text-amber-400", border: "border-amber-500/15",
                   action: () => setCurrentView("cram"),
                   highYield: true,
+                  tour: "cram",
                 },
                 {
                   label: "AI Examiner", desc: "AI tutor, mock examiner & quiz", icon: "🤖",
                   iconBg: "bg-primary-500/10 text-primary-400", border: "border-primary-500/15",
                   action: () => setCurrentView("ai-examiner"),
                   highYield: true,
+                  tour: "ai-examiner",
                 },
                 {
                   label: "Rapid-Fire Drill", desc: "30s per question — exam pressure simulator", icon: "⚡",
@@ -899,6 +985,7 @@ export default function Home() {
                 <button
                   key={item.label}
                   onClick={item.action}
+                  data-tour={"tour" in item ? (item as { tour?: string }).tour : undefined}
                   className={`glass-card rounded-xl p-4 text-left hover-lift group transition-all ${item.border ? `border ${item.border}` : ""}`}
                 >
                   <div className="flex items-center gap-3 mb-1.5">
@@ -988,6 +1075,9 @@ export default function Home() {
       </button>
 
       <KeyboardShortcutsOverlay open={showHelp} onClose={() => setShowHelp(false)} />
+
+      {/* First-time onboarding tour — renders only if localStorage flag unset. */}
+      <OnboardingTour enabled={!loading && !!database} />
     </div>
   );
 }

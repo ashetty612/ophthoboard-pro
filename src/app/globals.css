@@ -1,17 +1,43 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #ecfeff;
-  --color-primary-100: #cffafe;
-  --color-primary-200: #a5f3fc;
-  --color-primary-300: #67e8f9;
-  --color-primary-400: #22d3ee;
-  --color-primary-500: #06b6d4;
-  --color-primary-600: #0891b2;
-  --color-primary-700: #0e7490;
-  --color-primary-800: #155e75;
-  --color-primary-900: #164e63;
-  --color-primary-950: #083344;
+  /* Clear Vision Ed-inspired: emerald brand primary (#047962), steel-blue
+   * secondary. Retuned from cyan to read warmer/clinical. The old
+   * --color-primary-* slots are kept but map to the emerald scale so
+   * existing "primary-500/600/400" class usages automatically adopt the
+   * new brand without a full codebase rewrite.
+   */
+  --color-primary-50:  #ecfdf5;
+  --color-primary-100: #d1fae5;
+  --color-primary-200: #a7f3d0;
+  --color-primary-300: #6ee7b7;
+  --color-primary-400: #34d399;
+  --color-primary-500: #10a37f;
+  --color-primary-600: #047962;
+  --color-primary-700: #036050;
+  --color-primary-800: #024a3e;
+  --color-primary-900: #013830;
+  --color-primary-950: #00221c;
+
+  /* Steel-blue secondary — the twin brand voice from Clear Vision Ed.
+   * Used for section eyebrows, info chips, secondary buttons, chart axes.
+   */
+  --color-steel-50:  #f0f7fa;
+  --color-steel-100: #dbeaf0;
+  --color-steel-200: #b6d5e0;
+  --color-steel-300: #7ba5bb;
+  --color-steel-400: #4f8aa5;
+  --color-steel-500: #347896;
+  --color-steel-600: #2a6179;
+  --color-steel-700: #1f4a5c;
+  --color-steel-800: #163846;
+  --color-steel-900: #0d2530;
+
+  /* Deep navy "ink" for headings when a non-white background is used. */
+  --color-ink-300: #5e7a8d;
+  --color-ink-500: #2c5a70;
+  --color-ink-700: #164c61;
+  --color-ink-900: #082754;
 
   --color-emerald-50: #ecfdf5;
   --color-emerald-100: #d1fae5;
@@ -61,7 +87,8 @@
   --bg-gradient-start: #020a13;
   --bg-gradient-mid: #091520;
   --bg-gradient-end: #07111d;
-  --accent-glow: rgba(6, 182, 212, 0.12);
+  /* Emerald accent glow (formerly cyan) */
+  --accent-glow: rgba(4, 121, 98, 0.14);
 }
 
 html {
@@ -74,6 +101,8 @@ body {
   min-height: 100vh;
   color: #cbd5e1;
   position: relative;
+  /* Clear Vision brief: a touch more breathing room in body copy. */
+  line-height: 1.65;
 }
 
 /* Subtle grid background */
@@ -82,8 +111,10 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(6, 182, 212, 0.07), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(139, 92, 246, 0.05), transparent 50%),
+    /* Emerald top-center bloom (from Clear Vision Ed brand primary) */
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(4, 121, 98, 0.10), transparent 60%),
+    /* Steel-blue bottom-right glow (brand secondary) */
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(52, 120, 150, 0.08), transparent 50%),
     linear-gradient(160deg, var(--bg-gradient-start), var(--bg-gradient-mid) 50%, var(--bg-gradient-end));
   z-index: -2;
   pointer-events: none;
@@ -103,7 +134,8 @@ body::after {
 /* Headings use Space Grotesk */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;
-  letter-spacing: -0.02em;
+  /* Warmer tracking — Clear Vision brief (was -0.02em). */
+  letter-spacing: -0.01em;
 }
 
 /* Monospace for scores/numbers */
@@ -166,8 +198,8 @@ h1, h2, h3, h4, h5, h6 {
   to { opacity: 1; transform: translateX(0); }
 }
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(6, 182, 212, 0.15); }
-  50% { box-shadow: 0 0 24px rgba(6, 182, 212, 0.35); }
+  0%, 100% { box-shadow: 0 0 8px rgba(4, 121, 98, 0.18); }
+  50% { box-shadow: 0 0 24px rgba(4, 121, 98, 0.38); }
 }
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -209,8 +241,10 @@ h1, h2, h3, h4, h5, h6 {
 .score-ring { transform: rotate(-90deg); }
 
 /* Gradient text */
+/* Brand-inspired gradient: emerald → steel-blue → deep navy. Replaces the
+ * old cyan→violet→pink rainbow for a more clinical identity. */
 .gradient-text {
-  background: linear-gradient(135deg, #22d3ee, #a78bfa, #f472b6);
+  background: linear-gradient(135deg, #34d399, #10a37f, #347896, #164c61);
   background-size: 200% 200%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -219,10 +253,17 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .gradient-text-subtle {
-  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 50%, #0891b2 100%);
+  background: linear-gradient(135deg, #34d399 0%, #10a37f 50%, #047962 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* "Emph" — the signature Clear Vision italic-accent word inside headings. */
+.emph {
+  font-style: italic;
+  color: var(--color-primary-400);
+  font-weight: 700;
 }
 
 /* Progress bar animation */
@@ -234,25 +275,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(6, 182, 212, 0.08);
+  /* Emerald tinted ring on hover (was cyan) */
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(4, 121, 98, 0.10);
 }
 
 /* Focus styles */
 textarea:focus, input:focus, select:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.3);
-  border-color: rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.35);
+  border-color: rgba(4, 121, 98, 0.55);
 }
 
-/* Button focus */
+/* Button focus — emerald tinted */
 button:focus-visible {
-  outline: 2px solid rgba(6, 182, 212, 0.5);
+  outline: 2px solid rgba(16, 163, 127, 0.55);
   outline-offset: 2px;
 }
 
-/* Selection */
+/* Selection — emerald */
 ::selection {
-  background: rgba(6, 182, 212, 0.25);
+  background: rgba(16, 163, 127, 0.28);
   color: #fff;
 }
 
@@ -297,4 +339,15 @@ button:focus-visible {
 .divider-glow {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.2), transparent);
+}
+
+/* Pill CTA — Clear Vision-style rounded action button. */
+.btn-pill {
+  @apply inline-flex items-center gap-2 px-7 py-3 rounded-full font-semibold tracking-wide transition-all duration-200;
+}
+.btn-pill-primary {
+  @apply bg-primary-600 text-white shadow-[0_6px_20px_-6px_rgba(4,121,98,0.55)] hover:bg-primary-700;
+}
+.btn-pill-secondary {
+  @apply bg-steel-500 text-white shadow-[0_6px_20px_-6px_rgba(52,120,150,0.45)] hover:bg-steel-600;
 }

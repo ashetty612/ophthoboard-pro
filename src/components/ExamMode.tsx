@@ -5,12 +5,11 @@ import { CasesDatabase, CaseData } from "@/lib/types";
 import { scoreAnswer, scorePhotoDescription, calculateGrade, getGradeColor, getGradeBgColor } from "@/lib/scoring";
 import { saveAttempt } from "@/lib/storage";
 import { QUESTION_TYPE_INFO } from "@/lib/pearls";
-import { CaseAttempt, UserAnswer } from "@/lib/types";
+import { CaseAttempt } from "@/lib/types";
 
 interface ExamModeProps {
   database: CasesDatabase;
   onBack: () => void;
-  onSelectCase: (caseData: CaseData) => void;
 }
 
 type ExamPhase = "setup" | "active" | "results" | "review";
@@ -100,7 +99,9 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
 
     setExamCases(selected);
     setCurrentCaseIdx(0);
-    setCurrentQuestionIdx(selected[0]?.imageFile ? -1 : 0);
+    // Show photo-description phase if the first case has any image (local or external).
+    const firstHasImage = !!(selected[0] && (selected[0].imageFile || selected[0].externalImageUrl));
+    setCurrentQuestionIdx(firstHasImage ? -1 : 0);
     setTimeRemaining(timePerCase * 60);
     setTotalTimeRemaining(totalExamTime);
     setAnswers({});
@@ -171,7 +172,9 @@ export default function ExamMode({ database, onBack }: ExamModeProps) {
     }
     const nextCase = examCases[currentCaseIdx + 1];
     setCurrentCaseIdx(currentCaseIdx + 1);
-    setCurrentQuestionIdx(nextCase.imageFile ? -1 : 0);
+    // Show photo-description phase if the next case has any image (local or external).
+    const nextHasImage = !!(nextCase && (nextCase.imageFile || nextCase.externalImageUrl));
+    setCurrentQuestionIdx(nextHasImage ? -1 : 0);
     setTimeRemaining(timePerCase * 60);
   };
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { CasesDatabase, CaseData } from "@/lib/types";
-import { FATAL_FLAWS, FatalFlaw } from "@/lib/fatal-flaws";
+import { FATAL_FLAWS } from "@/lib/fatal-flaws";
 import { toggleBookmark, getBookmarks } from "@/lib/storage";
 
 interface RapidFireDrillProps {
