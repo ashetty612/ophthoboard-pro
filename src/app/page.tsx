@@ -31,6 +31,10 @@ import { analyzeWeaknesses } from "@/lib/weakness-quiz";
 import { getAttempts } from "@/lib/storage";
 import { useGlobalKeyboard, type GlobalView } from "@/lib/use-global-keyboard";
 import HeatmapView from "@/components/HeatmapView";
+import StudyModeCard, { type StudyModeSize } from "@/components/StudyModeCard";
+import FeatureMarquee from "@/components/FeatureMarquee";
+import { motion } from "framer-motion";
+import { staggerFast } from "@/lib/motion";
 import { computeHeatmap, axisLabel, type HeatmapCell } from "@/lib/heatmap";
 
 type View = "home" | "subspecialty" | "case" | "dashboard" | "review" | "exam" | "paired-exam" | "flashcards" | "ai-examiner" | "ppp" | "cram" | "due-today" | "rapid-fire" | "weakness-quiz" | "heatmap" | "settings" | "user-flashcards" | "qbank";
@@ -653,6 +657,9 @@ export default function Home() {
           onOpenAI={() => setCurrentView("ai-examiner")}
         />
 
+        {/* Infinite feature marquee — pauses on hover */}
+        {!searchQuery && <FeatureMarquee />}
+
         {/* User progress row — kept but visually subordinate to the hero */}
         {progress.totalCasesAttempted > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
@@ -863,47 +870,137 @@ export default function Home() {
                 {examWeekMode ? "🔥 Exam-Week Mode ON" : "Exam-Week Mode"}
               </button>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-14">
-              {([
+            {(() => {
+              type Mode = {
+                label: string;
+                desc: string;
+                icon: string;
+                gradient: string;
+                size: StudyModeSize;
+                badge?: "new" | "popular" | "hot";
+                action: () => void;
+                highYield: boolean;
+                tour?: string;
+                status?: string;
+              };
+
+              const modes: Mode[] = [
+                {
+                  label: "Paired-Topic Mock Exam",
+                  desc: "Authentic ABO room format — 2 examiners, 14 cases, 50 min. The closest thing to the real deal.",
+                  icon: "🏛️",
+                  gradient: "from-primary-500 to-emerald-600",
+                  size: "xl",
+                  badge: "popular",
+                  action: () => setCurrentView("paired-exam"),
+                  highYield: true,
+                  status: "50 min · 14 cases",
+                },
+                {
+                  label: "AI Examiner",
+                  desc: "Real-time AI tutor & mock examiner. 10 modes, Gemini-powered.",
+                  icon: "🤖",
+                  gradient: "from-steel-400 to-primary-500",
+                  size: "lg",
+                  badge: "hot",
+                  action: () => setCurrentView("ai-examiner"),
+                  highYield: true,
+                  tour: "ai-examiner",
+                  status: "Live AI · voice-ready",
+                },
+                {
+                  label: "Cram Sheet",
+                  desc: "Printable high-yield reference across all subspecialties.",
+                  icon: "📝",
+                  gradient: "from-amber-400 to-amber-600",
+                  size: "md",
+                  action: () => setCurrentView("cram"),
+                  highYield: true,
+                  tour: "cram",
+                },
                 {
                   label: "Due Today",
                   desc: dueCount > 0
                     ? `${dueCount} due${overdueCount > 0 ? `, ${overdueCount} overdue` : ""}`
                     : progress.totalCasesAttempted === 0
-                    ? "Study a case to build your review queue"
-                    : "All caught up — come back tomorrow",
-                  highYield: true,
+                    ? "Study a case to build your review queue."
+                    : "All caught up — come back tomorrow.",
                   icon: "📅",
-                  iconBg: overdueCount > 0 ? "bg-rose-500/10 text-rose-400" : "bg-primary-500/10 text-primary-400",
-                  border: overdueCount > 0 ? "border-rose-500/20" : "border-primary-500/15",
+                  gradient: overdueCount > 0 ? "from-rose-500 to-amber-500" : "from-primary-500 to-steel-500",
+                  size: "md",
                   action: () => setCurrentView("due-today"),
+                  highYield: true,
+                  status: "SRS queue",
+                },
+                {
+                  label: "Performance Heatmap",
+                  desc: heatmapWeakestCell
+                    ? `Weakest: ${axisLabel(heatmapWeakestCell.axis)} in ${heatmapWeakestCell.subspecialty} — ${heatmapWeakestCell.averagePercent}%`
+                    : "Subspecialty × ABO-axis breakdown.",
+                  icon: "📊",
+                  gradient: "from-primary-500 to-steel-400",
+                  size: "md",
+                  badge: "new",
+                  action: () => setCurrentView("heatmap"),
+                  highYield: true,
                 },
                 {
                   label: "Weakness Drill",
                   desc: weakestHint
                     ? `Next recommended: ${weakestHint}`
                     : progress.totalCasesAttempted === 0
-                    ? "Complete cases to unlock weakness targeting"
-                    : "Target your lowest-scoring areas",
+                    ? "Complete cases to unlock weakness targeting."
+                    : "Target your lowest-scoring areas.",
                   icon: "🎯",
-                  iconBg: "bg-cyan-500/10 text-cyan-400", border: "border-cyan-500/15",
+                  gradient: "from-steel-500 to-primary-600",
+                  size: "md",
                   action: () => setCurrentView("weakness-quiz"),
                   highYield: true,
                 },
                 {
-                  label: "📊 Performance Heatmap",
-                  desc: heatmapWeakestCell
-                    ? `Weakest: ${axisLabel(heatmapWeakestCell.axis)} in ${heatmapWeakestCell.subspecialty} (${heatmapWeakestCell.averagePercent}%)`
-                    : "Subspecialty × ABO-axis breakdown",
-                  icon: "📊",
-                  iconBg: "bg-[color:var(--color-primary-500)]/15 text-primary-300",
-                  border: "border-[color:var(--color-primary-500)]/30",
-                  action: () => setCurrentView("heatmap"),
+                  label: "Rapid-Fire Drill",
+                  desc: "30s per question — exam pressure simulator.",
+                  icon: "⚡",
+                  gradient: "from-rose-500 to-amber-500",
+                  size: "sm",
+                  action: () => setCurrentView("rapid-fire"),
+                  highYield: true,
+                  status: "30s · per Q",
+                },
+                {
+                  label: "Q-Bank",
+                  desc: "50 high-yield board-style questions & answers.",
+                  icon: "🧠",
+                  gradient: "from-primary-400 to-steel-500",
+                  size: "sm",
+                  action: () => setCurrentView("qbank"),
                   highYield: true,
                 },
                 {
-                  label: "Random Case", desc: "Jump into a surprise case", icon: "🎲",
-                  iconBg: "bg-emerald-500/10 text-emerald-400", border: "",
+                  label: "My Flashcards",
+                  desc: "Your custom cards — SRS-scheduled.",
+                  icon: "📇",
+                  gradient: "from-steel-400 to-steel-600",
+                  size: "sm",
+                  action: () => setCurrentView("user-flashcards"),
+                  highYield: true,
+                },
+                {
+                  label: "Exam Simulation",
+                  desc: "Timed mock exam with random cases.",
+                  icon: "⏱️",
+                  gradient: "from-amber-500 to-rose-500",
+                  size: "sm",
+                  action: () => setCurrentView("exam"),
+                  highYield: false,
+                  tour: "exam",
+                },
+                {
+                  label: "Random Case",
+                  desc: "Jump into a surprise case right now.",
+                  icon: "🎲",
+                  gradient: "from-emerald-400 to-primary-500",
+                  size: "sm",
                   action: () => {
                     const allCases = database.subspecialties.flatMap((s) => s.cases.filter((c) => c.questions.length > 0));
                     if (allCases.length === 0) return;
@@ -912,102 +1009,80 @@ export default function Home() {
                   highYield: false,
                 },
                 {
-                  label: "Exam Simulation", desc: "Timed mock exam with random cases", icon: "⏱️",
-                  iconBg: "bg-amber-500/10 text-amber-400", border: "border-amber-500/15",
-                  action: () => setCurrentView("exam"),
-                  highYield: false,
-                  tour: "exam",
-                },
-                {
-                  label: "🏛️ Paired-Topic Mock Exam",
-                  desc: "Authentic ABO room format — 2 examiners, 14 cases, 50 min",
-                  icon: "🏛️",
-                  iconBg: "bg-emerald-500/10 text-emerald-400",
-                  border: "border-emerald-500/15",
-                  action: () => setCurrentView("paired-exam"),
-                  highYield: true,
-                },
-                {
-                  label: "Quick Review", desc: "Browse answers without scoring", icon: "📋",
-                  iconBg: "bg-primary-500/10 text-primary-400", border: "",
-                  action: () => setCurrentView("review"),
-                  highYield: false,
-                },
-                {
-                  label: "Flashcards", desc: "Rapid concept review cards", icon: "🃏",
-                  iconBg: "bg-violet-500/10 text-violet-400", border: "",
+                  label: "Flashcards",
+                  desc: "Rapid concept review cards.",
+                  icon: "🃏",
+                  gradient: "from-steel-500 to-primary-500",
+                  size: "sm",
                   action: () => setCurrentView("flashcards"),
                   highYield: false,
                 },
                 {
-                  label: "My Flashcards", desc: "Your custom cards — SRS-scheduled", icon: "📇",
-                  iconBg: "bg-fuchsia-500/10 text-fuchsia-400", border: "",
-                  action: () => setCurrentView("user-flashcards"),
-                  highYield: true,
+                  label: "Quick Review",
+                  desc: "Browse answers without scoring.",
+                  icon: "📋",
+                  gradient: "from-primary-500 to-emerald-500",
+                  size: "sm",
+                  action: () => setCurrentView("review"),
+                  highYield: false,
                 },
                 {
-                  label: "Cram Sheet", desc: "Printable high-yield subspecialty reference", icon: "📝",
-                  iconBg: "bg-amber-500/10 text-amber-400", border: "border-amber-500/15",
-                  action: () => setCurrentView("cram"),
-                  highYield: true,
-                  tour: "cram",
-                },
-                {
-                  label: "AI Examiner", desc: "AI tutor, mock examiner & quiz", icon: "🤖",
-                  iconBg: "bg-primary-500/10 text-primary-400", border: "border-primary-500/15",
-                  action: () => setCurrentView("ai-examiner"),
-                  highYield: true,
-                  tour: "ai-examiner",
-                },
-                {
-                  label: "Rapid-Fire Drill", desc: "30s per question — exam pressure simulator", icon: "⚡",
-                  iconBg: "bg-rose-500/10 text-rose-400", border: "border-rose-500/15",
-                  action: () => setCurrentView("rapid-fire"),
-                  highYield: true,
-                },
-                {
-                  label: "🧠 Q-Bank", desc: "50 high-yield board-style Q&A", icon: "🧠",
-                  iconBg: "bg-fuchsia-500/10 text-fuchsia-400", border: "border-fuchsia-500/15",
-                  action: () => setCurrentView("qbank"),
-                  highYield: true,
-                },
-                {
-                  label: "Practice Patterns", desc: "AAO PPP guidelines & quizzes", icon: "📋",
-                  iconBg: "bg-teal-500/10 text-teal-400", border: "border-teal-500/15",
+                  label: "Practice Patterns",
+                  desc: "AAO PPP guidelines & quizzes.",
+                  icon: "📖",
+                  gradient: "from-steel-400 to-primary-500",
+                  size: "sm",
                   action: () => setCurrentView("ppp"),
                   highYield: false,
                 },
                 {
-                  label: "Analytics", desc: "Performance analytics & insights", icon: "📊",
-                  iconBg: "bg-purple-500/10 text-purple-400", border: "",
+                  label: "Analytics",
+                  desc: "Performance analytics & insights.",
+                  icon: "📈",
+                  gradient: "from-primary-500 to-steel-600",
+                  size: "sm",
                   action: () => setCurrentView("dashboard"),
                   highYield: false,
                 },
                 {
-                  label: "Settings / Data", desc: "Export, import, or reset your progress", icon: "⚙️",
-                  iconBg: "bg-slate-500/10 text-slate-300", border: "",
+                  label: "Settings / Data",
+                  desc: "Export, import, or reset your progress.",
+                  icon: "⚙️",
+                  gradient: "from-slate-500 to-slate-700",
+                  size: "sm",
                   action: () => setCurrentView("settings"),
                   highYield: false,
                 },
-              ] as const).filter((item) => !examWeekMode || item.highYield).map((item) => (
-                <button
-                  key={item.label}
-                  onClick={item.action}
-                  data-tour={"tour" in item ? (item as { tour?: string }).tour : undefined}
-                  className={`glass-card rounded-xl p-4 text-left hover-lift group transition-all ${item.border ? `border ${item.border}` : ""}`}
+              ];
+
+              const visible = modes.filter((m) => !examWeekMode || m.highYield);
+
+              return (
+                <motion.div
+                  variants={staggerFast}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, margin: "-80px" }}
+                  className="mb-14 grid grid-cols-2 sm:grid-cols-6 auto-rows-[minmax(132px,auto)] gap-3"
                 >
-                  <div className="flex items-center gap-3 mb-1.5">
-                    <div className={`w-9 h-9 rounded-lg ${item.iconBg} flex items-center justify-center text-base`}>
-                      {item.icon}
-                    </div>
-                    <h4 className="text-sm font-semibold text-white group-hover:text-primary-300 transition-colors">
-                      {item.label}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-500 ml-12">{item.desc}</p>
-                </button>
-              ))}
-            </div>
+                  {visible.map((m) => (
+                    <StudyModeCard
+                      key={m.label}
+                      label={m.label}
+                      desc={m.desc}
+                      icon={m.icon}
+                      gradient={m.gradient}
+                      size={m.size}
+                      badge={m.badge}
+                      highYield={m.highYield}
+                      tourId={m.tour}
+                      status={m.status}
+                      onClick={m.action}
+                    />
+                  ))}
+                </motion.div>
+              );
+            })()}
           </>
         )}
 

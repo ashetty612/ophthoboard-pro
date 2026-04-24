@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import {
+  motion,
+  AnimatePresence,
+  LayoutGroup,
+  useReducedMotion,
+  type Variants,
+} from "framer-motion";
 import { CaseData, UserAnswer, CaseAttempt } from "@/lib/types";
 import {
   scoreAnswer,
@@ -13,6 +20,7 @@ import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateSt
 import { getPearlsForCase, QUESTION_TYPE_INFO } from "@/lib/pearls";
 import { getFatalFlawsForCase } from "@/lib/fatal-flaws";
 import { rateCase, type Rating } from "@/lib/srs";
+import { easeOut, easeSpring, fadeUp, staggerMed } from "@/lib/motion";
 import AudioNarrator from "@/components/AudioNarrator";
 
 interface CaseViewerProps {
@@ -22,7 +30,51 @@ interface CaseViewerProps {
 
 type Phase = "intro" | "photo" | "questions" | "results";
 
+// ---- Animated score ring (0 -> target) ----
+function ScoreRing({ percent, color, reduce }: { percent: number; color: string; reduce: boolean }) {
+  const CIRC = 327; // 2πr where r=52
+  const target = (percent / 100) * CIRC;
+  return (
+    <motion.circle
+      cx="60"
+      cy="60"
+      r="52"
+      fill="none"
+      stroke={color}
+      strokeWidth="8"
+      strokeLinecap="round"
+      strokeDasharray={`${target} ${CIRC}`}
+      initial={reduce ? { strokeDasharray: `${target} ${CIRC}` } : { strokeDasharray: `0 ${CIRC}` }}
+      animate={{ strokeDasharray: `${target} ${CIRC}` }}
+      transition={{ duration: reduce ? 0 : 1.4, ease: easeOut, delay: reduce ? 0 : 0.2 }}
+    />
+  );
+}
+
+// ---- Segmented progress bar for questions phase ----
+function QuestionProgress({ total, current, showAnswer }: { total: number; current: number; showAnswer: boolean }) {
+  return (
+    <div className="flex gap-1 px-4 py-2 max-w-4xl mx-auto">
+      {Array.from({ length: total }).map((_, i) => {
+        const done = i < current || (i === current && showAnswer);
+        const active = i === current && !showAnswer;
+        return (
+          <div key={i} className="relative flex-1 h-1 rounded-full bg-slate-800 overflow-hidden">
+            <motion.div
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-500 to-primary-400"
+              initial={false}
+              animate={{ width: done ? "100%" : active ? "35%" : "0%" }}
+              transition={{ duration: 0.5, ease: easeOut }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
+  const reduce = useReducedMotion() ?? false;
   const [phase, setPhase] = useState<Phase>("intro");
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [userAnswers, setUserAnswers] = useState<string[]>(
@@ -37,16 +89,17 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   } | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  const [bookmarkPulse, setBookmarkPulse] = useState(0);
   const [startTime, setStartTime] = useState(Date.now());
   const [showImage, setShowImage] = useState(true);
   const [showTeaching, setShowTeaching] = useState(false);
   const [showPitfalls, setShowPitfalls] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [imageZoomed, setImageZoomed] = useState(false);
   const [srsRated, setSrsRated] = useState<{ rating: Rating; intervalDays: number } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // Memoize derived lookups so they only recompute when the case changes.
-  // `previousAttempts` reads from localStorage; `getFatalFlawsForCase` walks the
-  // full fatal-flaw registry — neither should run on every keystroke.
+
   const previousAttempts = useMemo(() => getAttemptsForCase(caseData.id), [caseData.id]);
   const pearls = useMemo(
     () => getPearlsForCase(caseData.subspecialty, caseData.title),
@@ -67,21 +120,15 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   }, [caseData.id]);
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
+    if (textareaRef.current) textareaRef.current.focus();
   }, [phase, currentQuestion]);
 
-  // Determine if case has any image (local or external)
   const hasImage = !!(caseData.imageFile || caseData.externalImageUrl);
   const hasPhotoDescription = !!(caseData.photoDescription && caseData.photoDescription.trim());
 
   const handleStartCase = () => {
-    if (hasImage && hasPhotoDescription) {
-      setPhase("photo");
-    } else {
-      setPhase("questions");
-    }
+    if (hasImage && hasPhotoDescription) setPhase("photo");
+    else setPhase("questions");
   };
 
   const handleSubmitPhotoDescription = () => {
@@ -95,9 +142,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
     setPhase("questions");
   };
 
-  const handleSubmitAnswer = () => {
-    setShowAnswer(true);
-  };
+  const handleSubmitAnswer = () => setShowAnswer(true);
 
   const handleNextQuestion = () => {
     setShowAnswer(false);
@@ -106,39 +151,40 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
     if (currentQuestion < caseData.questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      const scored = caseData.questions.map((q, i) => scoreAnswer(q, userAnswers[i]));
-      setScoredAnswers(scored);
-
-      const totalScore =
-        scored.reduce((sum, a) => sum + a.score, 0) +
-        (photoScore?.score || 0);
-      const maxPossible =
-        scored.reduce((sum, a) => sum + a.maxScore, 0) +
-        (photoScore?.maxScore || 0);
-      const percentageScore = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 100) : 0;
-
-      const attempt: CaseAttempt = {
-        caseId: caseData.id,
-        timestamp: new Date().toISOString(),
-        photoDescriptionAnswer: photoAnswer,
-        photoDescriptionScore: photoScore?.score || 0,
-        answers: scored,
-        totalScore,
-        maxPossibleScore: maxPossible,
-        percentageScore,
-        grade: calculateGrade(percentageScore),
-        timeSpentSeconds: Math.round((Date.now() - startTime) / 1000),
-      };
-
-      saveAttempt(attempt);
-      updateStudyStreak();
-      setPhase("results");
+      setSubmitting(true);
+      // Brief pulse before results slide in
+      window.setTimeout(() => {
+        const scored = caseData.questions.map((q, i) => scoreAnswer(q, userAnswers[i]));
+        setScoredAnswers(scored);
+        const totalScore =
+          scored.reduce((sum, a) => sum + a.score, 0) + (photoScore?.score || 0);
+        const maxPossible =
+          scored.reduce((sum, a) => sum + a.maxScore, 0) + (photoScore?.maxScore || 0);
+        const percentageScore = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 100) : 0;
+        const attempt: CaseAttempt = {
+          caseId: caseData.id,
+          timestamp: new Date().toISOString(),
+          photoDescriptionAnswer: photoAnswer,
+          photoDescriptionScore: photoScore?.score || 0,
+          answers: scored,
+          totalScore,
+          maxPossibleScore: maxPossible,
+          percentageScore,
+          grade: calculateGrade(percentageScore),
+          timeSpentSeconds: Math.round((Date.now() - startTime) / 1000),
+        };
+        saveAttempt(attempt);
+        updateStudyStreak();
+        setPhase("results");
+        setSubmitting(false);
+      }, reduce ? 0 : 450);
     }
   };
 
   const handleToggleBookmark = () => {
     const newState = toggleBookmark(caseData.id);
     setBookmarked(newState);
+    setBookmarkPulse((n) => n + 1);
   };
 
   const formatTime = (seconds: number): string => {
@@ -147,52 +193,89 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Render clinical image (local or external)
-  const renderClinicalImage = (maxWidth?: string) => {
-    if (caseData.imageFile) {
+  // Clinical image with cinematic materialization, vignette, and zoom-on-click
+  const renderClinicalImage = (
+    maxWidth?: string,
+    opts?: { float?: boolean; cinematic?: boolean; layoutId?: string }
+  ) => {
+    const src = caseData.imageFile
+      ? `/images/${caseData.imageFile}`
+      : caseData.externalImageUrl;
+    if (!src) return null;
+
+    const isExternal = !caseData.imageFile;
+    if (isExternal && imageLoadError) {
       return (
         <div className={`relative rounded-xl overflow-hidden bg-black/50 ${maxWidth || "max-w-lg"} mx-auto`}>
-          <img
-            src={`/images/${caseData.imageFile}`}
-            alt="Clinical photograph"
-            className="w-full h-auto"
+          <div className="p-8 text-center">
+            <p className="text-slate-400 text-sm mb-2">Clinical image unavailable</p>
+            <a
+              href={caseData.externalImageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-400 hover:text-primary-300 text-sm underline"
+            >
+              Open image in new tab
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    const float = opts?.float && !reduce;
+    const cinematic = opts?.cinematic;
+    const layoutId = opts?.layoutId;
+
+    return (
+      <motion.div
+        layoutId={layoutId}
+        className={`relative rounded-xl overflow-hidden bg-black/60 ${maxWidth || "max-w-lg"} mx-auto cursor-zoom-in group`}
+        onClick={() => setImageZoomed(true)}
+        initial={cinematic ? { opacity: 0, scale: 0.92 } : false}
+        animate={
+          float
+            ? { opacity: 1, scale: 1, y: [0, -4, 0] }
+            : cinematic
+            ? { opacity: 1, scale: 1 }
+            : undefined
+        }
+        transition={
+          float
+            ? { opacity: { duration: 0.4 }, scale: { duration: 0.4 }, y: { duration: 6, repeat: Infinity, ease: "easeInOut" } }
+            : cinematic
+            ? { duration: reduce ? 0 : 0.8, ease: easeOut, delay: reduce ? 0 : 0.35 }
+            : undefined
+        }
+        whileHover={reduce ? undefined : { scale: 1.01 }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt="Clinical photograph"
+          className="w-full h-auto"
+          onError={isExternal ? () => setImageLoadError(true) : undefined}
+        />
+        {cinematic && (
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-xl"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, transparent 55%, rgba(4,121,98,0.18) 85%, rgba(2,30,30,0.55) 100%)",
+              boxShadow: "inset 0 0 60px rgba(4,121,98,0.25)",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: reduce ? 0 : 1.1, delay: reduce ? 0 : 0.55 }}
           />
-        </div>
-      );
-    }
-    if (caseData.externalImageUrl) {
-      return (
-        <div className={`relative rounded-xl overflow-hidden bg-black/50 ${maxWidth || "max-w-lg"} mx-auto`}>
-          {imageLoadError ? (
-            <div className="p-8 text-center">
-              <p className="text-slate-400 text-sm mb-2">Clinical image unavailable</p>
-              <a
-                href={caseData.externalImageUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-400 hover:text-primary-300 text-sm underline"
-              >
-                Open image in new tab
-              </a>
-            </div>
-          ) : (
-            <img
-              src={caseData.externalImageUrl}
-              alt="Clinical photograph"
-              className="w-full h-auto"
-              onError={() => setImageLoadError(true)}
-            />
-          )}
-          {caseData.imageAttribution && !imageLoadError && (
-            <p className="text-[10px] text-slate-500 text-center mt-1 italic">{caseData.imageAttribution}</p>
-          )}
-        </div>
-      );
-    }
-    return null;
+        )}
+        {isExternal && caseData.imageAttribution && (
+          <p className="text-[10px] text-slate-500 text-center mt-1 italic">{caseData.imageAttribution}</p>
+        )}
+      </motion.div>
+    );
   };
 
-  // Header with navigation
   const renderHeader = () => (
     <div className="glass-card sticky top-0 z-50 border-b border-slate-700/50">
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -212,41 +295,60 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
           <p className="text-xs text-slate-400 truncate">{caseData.subspecialty}</p>
         </div>
 
-        <button
+        <motion.button
           onClick={handleToggleBookmark}
           aria-label={bookmarked ? "Remove bookmark" : "Bookmark this case"}
           aria-pressed={bookmarked}
+          whileTap={reduce ? undefined : { scale: 0.85 }}
           className={`p-2.5 min-h-[44px] min-w-[44px] rounded-lg transition-colors flex items-center justify-center ${
             bookmarked ? "text-amber-400 bg-amber-400/10" : "text-slate-400 hover:text-amber-400"
           }`}
         >
-          <svg className="w-5 h-5" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <motion.svg
+            key={bookmarkPulse}
+            initial={reduce ? false : { scale: 1 }}
+            animate={reduce ? undefined : { scale: [1, 1.35, 1] }}
+            transition={{ duration: 0.35, ease: easeSpring }}
+            className="w-5 h-5"
+            fill={bookmarked ? "currentColor" : "none"}
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-          </svg>
-        </button>
+          </motion.svg>
+        </motion.button>
       </div>
 
       {phase === "questions" && (
-        <div className="h-1 bg-slate-800">
-          <div
-            className="h-full bg-gradient-to-r from-primary-500 to-primary-400 progress-bar"
-            style={{
-              width: `${((currentQuestion + (showAnswer ? 1 : 0)) / caseData.questions.length) * 100}%`,
-            }}
-          />
-        </div>
+        <QuestionProgress
+          total={caseData.questions.length}
+          current={currentQuestion}
+          showAnswer={showAnswer}
+        />
       )}
     </div>
   );
 
-  // INTRO PHASE
+  // INTRO PHASE — cinematic slit-lamp opening
   if (phase === "intro") {
     return (
       <div className="min-h-screen">
         {renderHeader()}
-        <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in-up">
+        <motion.div
+          className="max-w-4xl mx-auto px-4 py-8"
+          initial="hidden"
+          animate="show"
+          variants={staggerMed}
+        >
           <div className="glass-card rounded-2xl p-8">
-            <div className="flex items-center gap-3 mb-6">
+            {/* Subspecialty ribbon — drops in from top */}
+            <motion.div
+              className="flex items-center gap-3 mb-6"
+              initial={reduce ? false : { opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: easeOut }}
+            >
               <span className="px-3 py-1 rounded-full bg-primary-500/20 text-primary-300 text-xs font-medium">
                 {caseData.subspecialty}
               </span>
@@ -258,27 +360,47 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                   Attempted {previousAttempts.length}x
                 </span>
               )}
-            </div>
+            </motion.div>
 
-            <h2 className="text-3xl font-bold text-white mb-4">{caseData.title}</h2>
+            {/* Title — fade + rise */}
+            <motion.h2
+              className="text-3xl font-bold text-white mb-4"
+              initial={reduce ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: easeOut, delay: reduce ? 0 : 0.15 }}
+            >
+              {caseData.title}
+            </motion.h2>
 
-            <div className="bg-slate-800/50 rounded-xl p-6 mb-6 border border-slate-700/50">
+            {/* Presentation */}
+            <motion.div
+              className="bg-slate-800/50 rounded-xl p-6 mb-6 border border-slate-700/50"
+              initial={reduce ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, ease: easeOut, delay: reduce ? 0 : 0.25 }}
+            >
               <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">
                 Patient Presentation
               </h3>
               <p className="text-lg text-white">{caseData.presentation}</p>
-            </div>
+            </motion.div>
 
+            {/* Clinical image — the star, materializes with vignette */}
             {hasImage && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                <motion.h3
+                  className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3"
+                  initial={reduce ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: reduce ? 0 : 0.35 }}
+                >
                   Clinical Image
-                </h3>
-                {renderClinicalImage()}
+                </motion.h3>
+                {renderClinicalImage(undefined, { cinematic: true, layoutId: "clinical-image" })}
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <motion.div variants={fadeUp} className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-slate-800/30 rounded-lg p-4">
                 <p className="text-xs text-slate-400 mb-1">Questions</p>
                 <p className="text-lg font-bold text-white">{caseData.questions.length}</p>
@@ -291,10 +413,13 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                     : "---"}
                 </p>
               </div>
-            </div>
+            </motion.div>
 
             {caseData.casePearls && caseData.casePearls.length > 0 && (
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-4">
+              <motion.div
+                variants={fadeUp}
+                className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-4"
+              >
                 <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">
                   High-Yield Pearls for This Case
                 </p>
@@ -306,11 +431,14 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </motion.div>
             )}
 
             {caseData.highYieldFacts && caseData.highYieldFacts.length > 0 && (
-              <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4 mb-4">
+              <motion.div
+                variants={fadeUp}
+                className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4 mb-4"
+              >
                 <p className="text-xs font-semibold text-violet-400 uppercase tracking-wider mb-2">
                   Board-Relevant Facts
                 </p>
@@ -322,45 +450,83 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </motion.div>
             )}
 
             {caseData.relatedConditions && caseData.relatedConditions.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-6">
+              <motion.div variants={fadeUp} className="flex flex-wrap gap-2 mb-6">
                 <span className="text-xs text-slate-500 mr-1">Related:</span>
                 {caseData.relatedConditions.map((cond, i) => (
                   <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-slate-700/50 text-slate-400">
                     {cond}
                   </span>
                 ))}
-              </div>
+              </motion.div>
             )}
 
             {pearls.length > 0 && (
-              <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 mb-6">
+              <motion.div
+                variants={fadeUp}
+                className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 mb-6"
+              >
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
                   Study Tip
                 </p>
                 <p className="text-sm text-slate-400">{pearls[0].pearl}</p>
-              </div>
+              </motion.div>
             )}
 
-            <div className="mb-6">
+            <motion.div variants={fadeUp} className="mb-6">
               <AudioNarrator
                 title={caseData.title}
                 presentation={caseData.presentation}
                 photoDescription={caseData.photoDescription}
               />
-            </div>
+            </motion.div>
 
-            <button
+            {/* CTA — gentle pulse glow */}
+            <motion.button
               onClick={handleStartCase}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-semibold text-lg transition-all shadow-lg shadow-primary-500/25 animate-pulse-glow"
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-semibold text-lg transition-colors relative overflow-hidden"
+              initial={reduce ? false : { opacity: 0, y: 10 }}
+              animate={
+                reduce
+                  ? { opacity: 1, y: 0 }
+                  : {
+                      opacity: 1,
+                      y: 0,
+                      boxShadow: [
+                        "0 10px 25px -5px rgba(4,121,98,0.25)",
+                        "0 10px 35px -5px rgba(4,121,98,0.55)",
+                        "0 10px 25px -5px rgba(4,121,98,0.25)",
+                      ],
+                    }
+              }
+              transition={
+                reduce
+                  ? { duration: 0 }
+                  : {
+                      opacity: { duration: 0.5, delay: 0.7 },
+                      y: { duration: 0.5, delay: 0.7 },
+                      boxShadow: { duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: 1 },
+                    }
+              }
+              whileHover={reduce ? undefined : { scale: 1.015 }}
+              whileTap={reduce ? undefined : { scale: 0.985 }}
             >
               Begin Case
-            </button>
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Zoom dialog for the clinical image */}
+        <ImageZoomOverlay
+          open={imageZoomed}
+          onClose={() => setImageZoomed(false)}
+          layoutId="clinical-image"
+          src={caseData.imageFile ? `/images/${caseData.imageFile}` : caseData.externalImageUrl || ""}
+          reduce={reduce}
+        />
       </div>
     );
   }
@@ -370,12 +536,22 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
     return (
       <div className="min-h-screen">
         {renderHeader()}
-        <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in-up">
+        <motion.div
+          className="max-w-4xl mx-auto px-4 py-8"
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: easeOut }}
+        >
           <div className="glass-card rounded-2xl p-8">
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 rounded-full bg-primary-500/20 flex items-center justify-center">
+              <motion.div
+                className="w-8 h-8 rounded-full bg-primary-500/20 flex items-center justify-center"
+                initial={reduce ? false : { scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.35, ease: easeSpring }}
+              >
                 <span className="text-primary-400 text-sm font-bold">0</span>
-              </div>
+              </motion.div>
               <h3 className="text-xl font-bold text-white">Describe this clinical photograph</h3>
             </div>
 
@@ -384,7 +560,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
             </p>
 
             <div className="mb-6">
-              {renderClinicalImage("max-w-2xl")}
+              {renderClinicalImage("max-w-2xl", { float: true, layoutId: "clinical-image" })}
             </div>
 
             <textarea
@@ -394,19 +570,32 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
               placeholder="Describe what you see in this image..."
               rows={5}
               disabled={showAnswer}
-              className="w-full p-4 rounded-xl bg-slate-800/50 border border-slate-600/50 text-white placeholder-slate-500 resize-none focus:border-primary-500 transition-colors"
+              className="w-full p-4 rounded-xl bg-slate-800/50 border border-slate-600/50 text-white placeholder-slate-500 resize-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/40 focus:shadow-[0_0_0_4px_rgba(4,121,98,0.15)] transition-all outline-none"
             />
 
             {!showAnswer ? (
-              <button
+              <motion.button
                 onClick={handleSubmitPhotoDescription}
                 disabled={!photoAnswer.trim()}
-                className="mt-4 w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium transition-colors"
+                whileHover={reduce ? undefined : { scale: 1.01 }}
+                whileTap={reduce ? undefined : { scale: 0.99 }}
+                className="mt-4 w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium transition-colors relative overflow-hidden group"
               >
-                Submit Description
-              </button>
+                <span className="relative z-10">Submit Description</span>
+                {!reduce && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                  />
+                )}
+              </motion.button>
             ) : (
-              <div className="mt-6 animate-fade-in">
+              <motion.div
+                className="mt-6"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: easeOut }}
+              >
                 <div className="flex items-center gap-4 mb-4">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-bold text-primary-400">
@@ -430,10 +619,18 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 >
                   Continue to Questions
                 </button>
-              </div>
+              </motion.div>
             )}
           </div>
-        </div>
+        </motion.div>
+
+        <ImageZoomOverlay
+          open={imageZoomed}
+          onClose={() => setImageZoomed(false)}
+          layoutId="clinical-image"
+          src={caseData.imageFile ? `/images/${caseData.imageFile}` : caseData.externalImageUrl || ""}
+          reduce={reduce}
+        />
       </div>
     );
   }
@@ -447,274 +644,333 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
       tips: "",
     };
     const teaching = question.teaching;
+    const currentLen = userAnswers[currentQuestion].length;
 
     return (
-      <div className="min-h-screen">
-        {renderHeader()}
-        <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
-          {hasImage && (
-            <button
-              onClick={() => setShowImage(!showImage)}
-              className="mb-4 flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d={showImage ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" : "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"}
-                />
-              </svg>
-              {showImage ? "Hide Image" : "Show Image"}
-            </button>
-          )}
-
-          {showImage && hasImage && (
-            <div className="mb-6">
-              {renderClinicalImage("max-w-md")}
-            </div>
-          )}
-
-          <div className="glass-card rounded-2xl p-8">
-            <div className="flex items-start gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center shrink-0">
-                <span className="text-primary-400 font-bold">{question.number}</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-primary-400 font-medium uppercase tracking-wider mb-1">
-                  {questionInfo.name}
-                </p>
-                <h3 className="text-xl font-bold text-white">{question.question}</h3>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 ml-13 mb-1 pl-13">{questionInfo.description}</p>
-
-            <div className="mt-3 mb-4 bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
-              <p className="text-xs text-slate-500">
-                <span className="text-amber-400/70 font-medium">Tip: </span>
-                {questionInfo.tips}
-              </p>
-            </div>
-
-            {teaching?.examinerExpectations && !showAnswer && (
-              <div className="mb-4 bg-blue-500/5 border border-blue-500/15 rounded-lg p-3">
-                <p className="text-xs text-blue-400 font-medium mb-1">What the Examiner is Looking For:</p>
-                <p className="text-xs text-blue-200/70">{teaching.examinerExpectations}</p>
-              </div>
+      <LayoutGroup>
+        <div className="min-h-screen">
+          {renderHeader()}
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            {hasImage && (
+              <button
+                onClick={() => setShowImage(!showImage)}
+                className="mb-4 flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d={showImage ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" : "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"}
+                  />
+                </svg>
+                {showImage ? "Hide Image" : "Show Image"}
+              </button>
             )}
 
-            <textarea
-              ref={textareaRef}
-              value={userAnswers[currentQuestion]}
-              onChange={(e) => {
-                const newAnswers = [...userAnswers];
-                newAnswers[currentQuestion] = e.target.value;
-                setUserAnswers(newAnswers);
-              }}
-              placeholder="Type your answer here... (Cmd+Enter to submit)"
-              rows={6}
-              disabled={showAnswer}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !showAnswer && userAnswers[currentQuestion].trim()) {
-                  handleSubmitAnswer();
-                }
-              }}
-              className="w-full p-4 rounded-xl bg-slate-800/50 border border-slate-600/50 text-white placeholder-slate-500 resize-none focus:border-primary-500 transition-colors"
-            />
+            {showImage && hasImage && (
+              <div className="mb-6">{renderClinicalImage("max-w-md", { layoutId: "clinical-image" })}</div>
+            )}
 
-            <div className="flex items-center justify-between mt-2 mb-4">
-              <p className="text-xs text-slate-500">
-                Question {currentQuestion + 1} of {caseData.questions.length}
-              </p>
-              <p className="text-xs text-slate-500">
-                {formatTime(Math.round((Date.now() - startTime) / 1000))} elapsed
-              </p>
-            </div>
-
-            {!showAnswer ? (
-              <div className="flex gap-3">
-                <button
-                  onClick={handleSubmitAnswer}
-                  disabled={!userAnswers[currentQuestion].trim()}
-                  className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium transition-colors"
-                >
-                  Submit Answer
-                </button>
-                <button
-                  onClick={() => setShowAnswer(true)}
-                  className="py-3 px-6 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium transition-colors"
-                >
-                  Skip / Show Answer
-                </button>
-              </div>
-            ) : (
-              <div className="animate-fade-in">
-                {/* Instant Score */}
-                {userAnswers[currentQuestion].trim() && (
-                  <div className="mb-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                    {(() => {
-                      const instantScore = scoreAnswer(question, userAnswers[currentQuestion]);
-                      const pct = Math.round((instantScore.score / instantScore.maxScore) * 100);
-                      return (
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-slate-300">Your Score</span>
-                            <span className={`text-lg font-bold ${pct >= 70 ? "text-emerald-400" : pct >= 50 ? "text-amber-400" : "text-rose-400"}`}>
-                              {instantScore.score}/{instantScore.maxScore} ({pct}%)
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-400">{instantScore.feedback}</p>
-                          {instantScore.matchedKeywords.length > 0 && (
-                            <div className="mt-3">
-                              <p className="text-xs text-emerald-400 font-medium mb-1">Matched:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {instantScore.matchedKeywords.map((k, i) => (
-                                  <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">{k}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {instantScore.missedKeywords.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-xs text-rose-400 font-medium mb-1">Missed:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {instantScore.missedKeywords.map((k, i) => (
-                                  <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">{k}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentQuestion}
+                className="glass-card rounded-2xl p-8"
+                initial={reduce ? false : { opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? undefined : { opacity: 0, y: -8 }}
+                transition={{ duration: 0.35, ease: easeOut }}
+              >
+                <div className="flex items-start gap-3 mb-2">
+                  <motion.div
+                    className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center shrink-0"
+                    initial={reduce ? false : { scale: 0, rotate: -90 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 320, damping: 18 }}
+                  >
+                    <span className="text-primary-400 font-bold">{question.number}</span>
+                  </motion.div>
+                  <div className="flex-1">
+                    <p className="text-xs text-primary-400 font-medium uppercase tracking-wider mb-1">
+                      {questionInfo.name}
+                    </p>
+                    <h3 className="text-xl font-bold text-white">{question.question}</h3>
                   </div>
-                )}
-
-                {/* Model Answer */}
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 mb-4">
-                  <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Model Answer</p>
-                  <div className="text-sm text-emerald-200/90 whitespace-pre-line">{question.answer}</div>
                 </div>
 
-                {/* Perfect Answer */}
-                {teaching?.perfectAnswer && (
-                  <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 mb-4">
-                    <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-1">What a Perfect Answer Looks Like</p>
-                    <p className="text-sm text-emerald-200/70">{teaching.perfectAnswer}</p>
+                <p className="text-xs text-slate-400 ml-13 mb-1 pl-13">{questionInfo.description}</p>
+
+                <div className="mt-3 mb-4 bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
+                  <p className="text-xs text-slate-500">
+                    <span className="text-amber-400/70 font-medium">Tip: </span>
+                    {questionInfo.tips}
+                  </p>
+                </div>
+
+                {teaching?.examinerExpectations && !showAnswer && (
+                  <div className="mb-4 bg-blue-500/5 border border-blue-500/15 rounded-lg p-3">
+                    <p className="text-xs text-blue-400 font-medium mb-1">What the Examiner is Looking For:</p>
+                    <p className="text-xs text-blue-200/70">{teaching.examinerExpectations}</p>
                   </div>
                 )}
 
-                {/* Acceptable Answers */}
-                {teaching?.acceptableAnswers && teaching.acceptableAnswers.length > 0 && (
-                  <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 mb-4">
-                    <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-2">Acceptable Responses</p>
-                    <ul className="space-y-1">
-                      {teaching.acceptableAnswers.map((ans, i) => (
-                        <li key={i} className="text-xs text-blue-200/70 flex items-start gap-2">
-                          <span className="text-blue-400 mt-0.5">&#x2713;</span>
-                          <span>{ans}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <textarea
+                  ref={textareaRef}
+                  value={userAnswers[currentQuestion]}
+                  onChange={(e) => {
+                    const newAnswers = [...userAnswers];
+                    newAnswers[currentQuestion] = e.target.value;
+                    setUserAnswers(newAnswers);
+                  }}
+                  placeholder="Type your answer here... (Cmd+Enter to submit)"
+                  rows={6}
+                  disabled={showAnswer}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !showAnswer && userAnswers[currentQuestion].trim()) {
+                      handleSubmitAnswer();
+                    }
+                  }}
+                  className="w-full p-4 rounded-xl bg-slate-800/50 border border-slate-600/50 text-white placeholder-slate-500 resize-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/40 focus:shadow-[0_0_0_4px_rgba(4,121,98,0.15)] transition-all outline-none"
+                />
 
-                {/* Incorrect Responses */}
-                {teaching?.incorrectResponses && teaching.incorrectResponses.length > 0 && (
-                  <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl p-4 mb-4">
-                    <p className="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-2">Incorrect / Penalized Responses</p>
-                    <ul className="space-y-1">
-                      {teaching.incorrectResponses.map((resp, i) => (
-                        <li key={i} className="text-xs text-rose-200/70 flex items-start gap-2">
-                          <span className="text-rose-400 mt-0.5">&#x2717;</span>
-                          <span>{resp}</span>
-                        </li>
-                      ))}
-                    </ul>
+                <div className="flex items-center justify-between mt-2 mb-4">
+                  <p className="text-xs text-slate-500">
+                    Question {currentQuestion + 1} of {caseData.questions.length}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-slate-500 tabular-nums">{currentLen} chars</p>
+                    <p className="text-xs text-slate-500">
+                      {formatTime(Math.round((Date.now() - startTime) / 1000))} elapsed
+                    </p>
                   </div>
-                )}
+                </div>
 
-                {/* Common Pitfalls (expandable) */}
-                {teaching?.commonPitfalls && teaching.commonPitfalls.length > 0 && (
-                  <div className="mb-4">
-                    <button
-                      onClick={() => setShowPitfalls(!showPitfalls)}
-                      className="w-full text-left bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 hover:bg-amber-500/10 transition-colors"
+                {!showAnswer ? (
+                  <div className="flex gap-3">
+                    <motion.button
+                      onClick={handleSubmitAnswer}
+                      disabled={!userAnswers[currentQuestion].trim() || submitting}
+                      whileHover={reduce ? undefined : { scale: 1.01 }}
+                      whileTap={reduce ? undefined : { scale: 0.99 }}
+                      className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium transition-colors"
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Common Pitfalls ({teaching.commonPitfalls.length})</p>
-                        <svg className={`w-4 h-4 text-amber-400 transition-transform ${showPitfalls ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
+                      {submitting ? (
+                        <motion.span
+                          animate={reduce ? undefined : { opacity: [1, 0.5, 1] }}
+                          transition={{ duration: 0.8, repeat: Infinity }}
+                        >
+                          Scoring...
+                        </motion.span>
+                      ) : (
+                        "Submit Answer"
+                      )}
+                    </motion.button>
+                    <button
+                      onClick={() => setShowAnswer(true)}
+                      className="py-3 px-6 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium transition-colors"
+                    >
+                      Skip / Show Answer
                     </button>
-                    {showPitfalls && (
-                      <div className="mt-2 bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 animate-fade-in">
-                        <ul className="space-y-2">
-                          {teaching.commonPitfalls.map((pitfall, i) => (
-                            <li key={i} className="text-xs text-amber-200/70 flex items-start gap-2">
-                              <span className="text-amber-400 mt-0.5">&#x26A0;</span>
-                              <span>{pitfall}</span>
+                  </div>
+                ) : (
+                  <motion.div
+                    initial={reduce ? false : { opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.35 }}
+                  >
+                    {userAnswers[currentQuestion].trim() && (
+                      <div className="mb-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                        {(() => {
+                          const instantScore = scoreAnswer(question, userAnswers[currentQuestion]);
+                          const pct = Math.round((instantScore.score / instantScore.maxScore) * 100);
+                          return (
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-slate-300">Your Score</span>
+                                <span className={`text-lg font-bold ${pct >= 70 ? "text-emerald-400" : pct >= 50 ? "text-amber-400" : "text-rose-400"}`}>
+                                  {instantScore.score}/{instantScore.maxScore} ({pct}%)
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-400">{instantScore.feedback}</p>
+                              {instantScore.matchedKeywords.length > 0 && (
+                                <div className="mt-3">
+                                  <p className="text-xs text-emerald-400 font-medium mb-1">Matched:</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {instantScore.matchedKeywords.map((k, i) => (
+                                      <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">{k}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {instantScore.missedKeywords.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs text-rose-400 font-medium mb-1">Missed:</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {instantScore.missedKeywords.map((k, i) => (
+                                      <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">{k}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 mb-4">
+                      <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Model Answer</p>
+                      <div className="text-sm text-emerald-200/90 whitespace-pre-line">{question.answer}</div>
+                    </div>
+
+                    {teaching?.perfectAnswer && (
+                      <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 mb-4">
+                        <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-1">What a Perfect Answer Looks Like</p>
+                        <p className="text-sm text-emerald-200/70">{teaching.perfectAnswer}</p>
+                      </div>
+                    )}
+
+                    {teaching?.acceptableAnswers && teaching.acceptableAnswers.length > 0 && (
+                      <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 mb-4">
+                        <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-2">Acceptable Responses</p>
+                        <ul className="space-y-1">
+                          {teaching.acceptableAnswers.map((ans, i) => (
+                            <li key={i} className="text-xs text-blue-200/70 flex items-start gap-2">
+                              <span className="text-blue-400 mt-0.5">&#x2713;</span>
+                              <span>{ans}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* Learning Points (expandable) */}
-                {teaching?.learningPoints && teaching.learningPoints.length > 0 && (
-                  <div className="mb-4">
-                    <button
-                      onClick={() => setShowTeaching(!showTeaching)}
-                      className="w-full text-left bg-violet-500/5 border border-violet-500/10 rounded-xl p-4 hover:bg-violet-500/10 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Learning Points ({teaching.learningPoints.length})</p>
-                        <svg className={`w-4 h-4 text-violet-400 transition-transform ${showTeaching ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </button>
-                    {showTeaching && (
-                      <div className="mt-2 bg-violet-500/5 border border-violet-500/10 rounded-xl p-4 animate-fade-in">
-                        <ul className="space-y-2">
-                          {teaching.learningPoints.map((point, i) => (
-                            <li key={i} className="text-xs text-violet-200/70 flex items-start gap-2">
-                              <span className="text-violet-400 mt-0.5">&#x2022;</span>
-                              <span>{point}</span>
+                    {teaching?.incorrectResponses && teaching.incorrectResponses.length > 0 && (
+                      <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl p-4 mb-4">
+                        <p className="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-2">Incorrect / Penalized Responses</p>
+                        <ul className="space-y-1">
+                          {teaching.incorrectResponses.map((resp, i) => (
+                            <li key={i} className="text-xs text-rose-200/70 flex items-start gap-2">
+                              <span className="text-rose-400 mt-0.5">&#x2717;</span>
+                              <span>{resp}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* Teaching Pearl */}
-                {pearls.length > 0 && (
-                  <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 mb-4">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Teaching Pearl</p>
-                    <p className="text-sm text-slate-400">{pearls[currentQuestion % pearls.length].pearl}</p>
-                    {pearls[currentQuestion % pearls.length].examTip && (
-                      <p className="text-xs text-slate-500 mt-2 italic">Exam Tip: {pearls[currentQuestion % pearls.length].examTip}</p>
+                    {teaching?.commonPitfalls && teaching.commonPitfalls.length > 0 && (
+                      <div className="mb-4">
+                        <button
+                          onClick={() => setShowPitfalls(!showPitfalls)}
+                          className="w-full text-left bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 hover:bg-amber-500/10 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Common Pitfalls ({teaching.commonPitfalls.length})</p>
+                            <svg className={`w-4 h-4 text-amber-400 transition-transform ${showPitfalls ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </button>
+                        <AnimatePresence initial={false}>
+                          {showPitfalls && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.25, ease: easeOut }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-2 bg-amber-500/5 border border-amber-500/10 rounded-xl p-4">
+                                <ul className="space-y-2">
+                                  {teaching.commonPitfalls.map((pitfall, i) => (
+                                    <li key={i} className="text-xs text-amber-200/70 flex items-start gap-2">
+                                      <span className="text-amber-400 mt-0.5">&#x26A0;</span>
+                                      <span>{pitfall}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     )}
-                  </div>
-                )}
 
-                <button
-                  onClick={handleNextQuestion}
-                  className="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
-                >
-                  {currentQuestion < caseData.questions.length - 1 ? "Next Question" : "See Results"}
-                </button>
-              </div>
-            )}
+                    {teaching?.learningPoints && teaching.learningPoints.length > 0 && (
+                      <div className="mb-4">
+                        <button
+                          onClick={() => setShowTeaching(!showTeaching)}
+                          className="w-full text-left bg-violet-500/5 border border-violet-500/10 rounded-xl p-4 hover:bg-violet-500/10 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Learning Points ({teaching.learningPoints.length})</p>
+                            <svg className={`w-4 h-4 text-violet-400 transition-transform ${showTeaching ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </button>
+                        <AnimatePresence initial={false}>
+                          {showTeaching && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.25, ease: easeOut }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-2 bg-violet-500/5 border border-violet-500/10 rounded-xl p-4">
+                                <ul className="space-y-2">
+                                  {teaching.learningPoints.map((point, i) => (
+                                    <li key={i} className="text-xs text-violet-200/70 flex items-start gap-2">
+                                      <span className="text-violet-400 mt-0.5">&#x2022;</span>
+                                      <span>{point}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+
+                    {pearls.length > 0 && (
+                      <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 mb-4">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Teaching Pearl</p>
+                        <p className="text-sm text-slate-400">{pearls[currentQuestion % pearls.length].pearl}</p>
+                        {pearls[currentQuestion % pearls.length].examTip && (
+                          <p className="text-xs text-slate-500 mt-2 italic">Exam Tip: {pearls[currentQuestion % pearls.length].examTip}</p>
+                        )}
+                      </div>
+                    )}
+
+                    <motion.button
+                      onClick={handleNextQuestion}
+                      whileHover={reduce ? undefined : { scale: 1.01 }}
+                      whileTap={reduce ? undefined : { scale: 0.99 }}
+                      className="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+                    >
+                      {submitting
+                        ? "Scoring..."
+                        : currentQuestion < caseData.questions.length - 1
+                        ? "Next Question"
+                        : "See Results"}
+                    </motion.button>
+                  </motion.div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
+
+          <ImageZoomOverlay
+            open={imageZoomed}
+            onClose={() => setImageZoomed(false)}
+            layoutId="clinical-image"
+            src={caseData.imageFile ? `/images/${caseData.imageFile}` : caseData.externalImageUrl || ""}
+            reduce={reduce}
+          />
         </div>
-      </div>
+      </LayoutGroup>
     );
   }
 
@@ -725,77 +981,44 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
     const percentageScore = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 100) : 0;
     const grade = calculateGrade(percentageScore);
     const timeSpent = Math.round((Date.now() - startTime) / 1000);
+    const ringColor = percentageScore >= 70 ? "#10b981" : percentageScore >= 50 ? "#f59e0b" : "#f43f5e";
+
+    const resultsStagger: Variants = {
+      hidden: {},
+      show: { transition: { staggerChildren: reduce ? 0 : 0.05, delayChildren: reduce ? 0 : 0.15 } },
+    };
 
     return (
       <div className="min-h-screen">
         {renderHeader()}
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="glass-card rounded-2xl p-8 text-center mb-8 animate-fade-in-up">
+        <motion.div
+          className="max-w-4xl mx-auto px-4 py-8"
+          initial="hidden"
+          animate="show"
+          variants={resultsStagger}
+        >
+          <motion.div variants={fadeUp} className="glass-card rounded-2xl p-8 text-center mb-8">
             <h2 className="text-2xl font-bold text-white mb-2">Case Complete</h2>
             {caseData.diagnosisTitle && (
               <p className="text-lg text-primary-400 font-medium mb-4">Diagnosis: {caseData.diagnosisTitle}</p>
             )}
-          </div>
+          </motion.div>
 
-          {/* Fatal Flaws — what examiners specifically fail candidates for missing */}
-          {fatalFlaws.length > 0 && (
-            <div className="mb-8 space-y-3 animate-fade-in-up">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-rose-400 text-lg" aria-hidden>⚠</span>
-                <h3 className="text-sm font-bold text-rose-300 uppercase tracking-[0.18em]">
-                  Fatal Flaws — Must Not Miss
-                </h3>
-              </div>
-              {fatalFlaws.map((flaw) => (
-                <div
-                  key={flaw.id}
-                  className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-5 text-left"
-                >
-                  <p className="text-xs uppercase tracking-wider text-rose-300/80 mb-1">
-                    {flaw.subspecialty}
-                  </p>
-                  <p className="text-base font-semibold text-rose-100 mb-2">
-                    {flaw.mustNotMiss}
-                  </p>
-                  <p className="text-sm text-slate-300 mb-3">
-                    <span className="text-slate-400">Scenario: </span>
-                    {flaw.scenario}
-                  </p>
-                  <p className="text-sm text-slate-300 mb-3">
-                    <span className="text-slate-400">Why: </span>
-                    {flaw.whyCritical}
-                  </p>
-                  <div className="rounded-lg bg-slate-900/60 border border-slate-700/50 p-3 mb-3">
-                    <p className="text-[11px] text-amber-400 uppercase tracking-wider mb-1 font-semibold">
-                      Say exactly
-                    </p>
-                    <p className="text-sm text-amber-100 italic leading-relaxed">
-                      {flaw.safetyNetPhrase}
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    <span className="text-slate-300 font-semibold">Immediate action: </span>
-                    {flaw.immediateAction}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="glass-card rounded-2xl p-8 text-center mb-8">
-
+          <motion.div variants={fadeUp} className="glass-card rounded-2xl p-8 text-center mb-8">
             <div className="relative w-40 h-40 mx-auto mb-6">
-              <svg className="w-40 h-40 score-ring" viewBox="0 0 120 120">
+              <svg className="w-40 h-40" viewBox="0 0 120 120">
                 <circle cx="60" cy="60" r="52" fill="none" stroke="#334155" strokeWidth="8" />
-                <circle cx="60" cy="60" r="52" fill="none"
-                  stroke={percentageScore >= 70 ? "#10b981" : percentageScore >= 50 ? "#f59e0b" : "#f43f5e"}
-                  strokeWidth="8" strokeLinecap="round"
-                  strokeDasharray={`${(percentageScore / 100) * 327} 327`}
-                  className="transition-all duration-1000"
-                />
+                <ScoreRing percent={percentageScore} color={ringColor} reduce={reduce} />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-white">{percentageScore}%</span>
+                <motion.span
+                  className="text-3xl font-bold text-white"
+                  initial={reduce ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4, delay: reduce ? 0 : 1.3 }}
+                >
+                  {percentageScore}%
+                </motion.span>
                 <span className={`text-sm font-medium ${getGradeColor(grade)}`}>{grade}</span>
               </div>
             </div>
@@ -827,7 +1050,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 const dPct = dMax > 0 ? Math.round((dScore / dMax) * 100) : 0;
                 return (
                   <div key={domain.label} className="bg-slate-800/50 rounded-xl p-3 text-center">
-                    <p className={`text-lg font-bold stat-number ${domain.color}`}>{dPct}%</p>
+                    <p className={`text-lg font-bold ${domain.color}`}>{dPct}%</p>
                     <p className="text-[10px] text-slate-400 mt-0.5">{domain.label}</p>
                   </div>
                 );
@@ -839,13 +1062,13 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 {percentageScore >= 70 ? "PASS" : "Needs more review"}
               </span>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="space-y-4 mb-8">
+          <motion.div variants={fadeUp} className="space-y-4 mb-8">
             <h3 className="text-lg font-bold text-white">Question Breakdown</h3>
 
             {photoScore && (
-              <div className="glass-card rounded-xl p-5 animate-slide-in">
+              <motion.div variants={fadeUp} className="glass-card rounded-xl p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary-500/20 flex items-center justify-center">
@@ -857,14 +1080,18 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                     {photoScore.score}/{photoScore.maxScore}
                   </span>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {scoredAnswers.map((answer, i) => {
               const pct = Math.round((answer.score / answer.maxScore) * 100);
               const q = caseData.questions[i];
               return (
-                <div key={i} className="glass-card rounded-xl p-5 animate-slide-in" style={{ animationDelay: `${i * 100}ms` }}>
+                <motion.div
+                  key={i}
+                  variants={fadeUp}
+                  className="glass-card rounded-xl p-5"
+                >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${pct >= 70 ? "bg-emerald-500/20" : pct >= 50 ? "bg-amber-500/20" : "bg-rose-500/20"}`}>
@@ -883,15 +1110,65 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                     </div>
                   </div>
                   <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full progress-bar ${pct >= 70 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"}`} style={{ width: `${pct}%` }} />
+                    <motion.div
+                      className={`h-full rounded-full ${pct >= 70 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"}`}
+                      initial={reduce ? { width: `${pct}%` } : { width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: reduce ? 0 : 0.9, ease: easeOut, delay: reduce ? 0 : 0.3 + i * 0.05 }}
+                    />
                   </div>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
+
+          {/* Fatal flaws — dramatic rose-tinted slide-in, arrives LAST */}
+          {fatalFlaws.length > 0 && (
+            <motion.div
+              className="mb-8 space-y-3"
+              initial={reduce ? false : { opacity: 0, x: -28 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, ease: easeOut, delay: reduce ? 0 : 0.6 + scoredAnswers.length * 0.05 }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <motion.span
+                  className="text-rose-400 text-lg"
+                  aria-hidden
+                  animate={reduce ? undefined : { scale: [1, 1.15, 1] }}
+                  transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  ⚠
+                </motion.span>
+                <h3 className="text-sm font-bold text-rose-300 uppercase tracking-[0.18em]">
+                  Fatal Flaws — Must Not Miss
+                </h3>
+              </div>
+              {fatalFlaws.map((flaw, i) => (
+                <motion.div
+                  key={flaw.id}
+                  className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-5 text-left shadow-[0_0_30px_-10px_rgba(244,63,94,0.4)]"
+                  initial={reduce ? false : { opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, ease: easeOut, delay: reduce ? 0 : 0.75 + i * 0.12 }}
+                >
+                  <p className="text-xs uppercase tracking-wider text-rose-300/80 mb-1">{flaw.subspecialty}</p>
+                  <p className="text-base font-semibold text-rose-100 mb-2">{flaw.mustNotMiss}</p>
+                  <p className="text-sm text-slate-300 mb-3"><span className="text-slate-400">Scenario: </span>{flaw.scenario}</p>
+                  <p className="text-sm text-slate-300 mb-3"><span className="text-slate-400">Why: </span>{flaw.whyCritical}</p>
+                  <div className="rounded-lg bg-slate-900/60 border border-slate-700/50 p-3 mb-3">
+                    <p className="text-[11px] text-amber-400 uppercase tracking-wider mb-1 font-semibold">Say exactly</p>
+                    <p className="text-sm text-amber-100 italic leading-relaxed">{flaw.safetyNetPhrase}</p>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    <span className="text-slate-300 font-semibold">Immediate action: </span>{flaw.immediateAction}
+                  </p>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
 
           {caseData.casePearls && caseData.casePearls.length > 0 && (
-            <div className="glass-card rounded-xl p-5 mb-6">
+            <motion.div variants={fadeUp} className="glass-card rounded-xl p-5 mb-6">
               <p className="text-sm font-semibold text-amber-400 mb-3">Key Takeaways for This Case</p>
               <ul className="space-y-2">
                 {caseData.casePearls.map((pearl, i) => (
@@ -901,10 +1178,10 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                   </li>
                 ))}
               </ul>
-            </div>
+            </motion.div>
           )}
 
-          <div className="glass-card rounded-xl p-5 mb-4">
+          <motion.div variants={fadeUp} className="glass-card rounded-xl p-5 mb-4">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               How well did you do? (Spaced Review)
             </p>
@@ -915,9 +1192,12 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 { r: "good" as Rating, label: "Good", sub: "normal", cls: "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30" },
                 { r: "easy" as Rating, label: "Easy", sub: "later", cls: "bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border-sky-500/30" },
               ] as const).map((btn) => (
-                <button
+                <motion.button
                   key={btn.r}
                   disabled={srsRated !== null}
+                  whileHover={reduce || srsRated !== null ? undefined : { y: -2 }}
+                  whileTap={reduce || srsRated !== null ? undefined : { scale: 0.96 }}
+                  transition={{ type: "spring", stiffness: 320, damping: 22 }}
                   onClick={() => {
                     const updated = rateCase(caseData.id, btn.r);
                     setSrsRated({ rating: btn.r, intervalDays: updated.interval });
@@ -926,21 +1206,31 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 >
                   <div>{btn.label}</div>
                   <div className="text-[10px] opacity-70 mt-0.5">{btn.sub}</div>
-                </button>
+                </motion.button>
               ))}
             </div>
             {srsRated && (
-              <p className="text-xs text-emerald-400 mt-3 text-center">
+              <motion.p
+                initial={reduce ? false : { opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-xs text-emerald-400 mt-3 text-center"
+              >
                 Scheduled for review in {srsRated.intervalDays} day{srsRated.intervalDays === 1 ? "" : "s"}.
-              </p>
+              </motion.p>
             )}
-          </div>
+          </motion.div>
 
-          <div className="flex gap-4">
-            <button onClick={onBack} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors">
+          <motion.div variants={fadeUp} className="flex gap-4">
+            <motion.button
+              onClick={onBack}
+              whileHover={reduce ? undefined : { scale: 1.01 }}
+              whileTap={reduce ? undefined : { scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 380, damping: 22 }}
+              className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+            >
               Back to Cases
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={() => {
                 setPhase("intro");
                 setCurrentQuestion(0);
@@ -955,15 +1245,59 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 setSrsRated(null);
                 setStartTime(Date.now());
               }}
+              whileHover={reduce ? undefined : { scale: 1.01 }}
+              whileTap={reduce ? undefined : { scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 380, damping: 22 }}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
             >
               Retry Case
-            </button>
-          </div>
-        </div>
+            </motion.button>
+          </motion.div>
+        </motion.div>
       </div>
     );
   }
 
   return null;
+}
+
+// ---- Click-to-zoom overlay (uses framer-motion LayoutGroup shared id) ----
+function ImageZoomOverlay({
+  open,
+  onClose,
+  layoutId,
+  src,
+  reduce,
+}: {
+  open: boolean;
+  onClose: () => void;
+  layoutId: string;
+  src: string;
+  reduce: boolean;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 cursor-zoom-out"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduce ? 0 : 0.25 }}
+          onClick={onClose}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Clinical image enlarged"
+        >
+          <motion.img
+            layoutId={layoutId}
+            src={src}
+            alt="Clinical photograph enlarged"
+            className="max-w-full max-h-full rounded-xl shadow-2xl"
+            transition={{ duration: reduce ? 0 : 0.4, ease: easeOut }}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }

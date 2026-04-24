@@ -1,21 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { CasesDatabase, CaseData } from "@/lib/types";
+import CVBLogo from "./CVBLogo";
+import { fadeUp, stagger, easeOut } from "@/lib/motion";
 
 /**
  * AI Examiner — powered by Gemini 3 Flash Preview (primary) via Google
  * Generative Language API, with Ollama Cloud (Kimi K2.6 / gpt-oss:120b)
  * as server-side fallback. API keys are server-side only; client never sees them.
  *
- * Fixes applied after debugging session:
- *   - Slim system prompts (~600 tokens, was ~7000). Fatal flaws injected
- *     via retrieval only when relevant.
- *   - Every mode auto-starts with meaningful content on session start.
- *   - Case images embedded directly in chat bubbles (not just linked).
- *   - Live elapsed-time indicator while the model is responding.
- *   - Inline markdown image rendering (![alt](url) → <img>).
- *   - Prompt quality: cite briefly, always explain WHY+HOW, end with 2-3 pearls.
+ * Visual upgrade (framer-motion):
+ *   - Mode selector: per-mode micro-icons, gradient border sweep on select,
+ *     staggered entrance, spring-bounce on tap.
+ *   - Chat bubbles: emerald gradient user bubbles, glass AI bubble w/ CVBLogo chip.
+ *   - New messages: fadeUp + x-offset entrance.
+ *   - Typing indicator: three staggered bouncing emerald dots.
+ *   - Reasoning shimmer: letter-spaced title + "(taking longer…)" after 3s.
+ *   - Stop button: pulsing red ring while streaming.
+ *   - Inline images: fade-in + subtle scale.
  */
 
 interface AIExaminerProps {
@@ -42,8 +46,7 @@ type ExaminerMode =
   | "free-chat";
 
 // ---------------------------------------------------------------------------
-// System prompts — intentionally lean. Retrieval layer on the server adds
-// fatal-flaw / trial / PPP context only when relevant to the query.
+// System prompts — intentionally lean.
 // ---------------------------------------------------------------------------
 
 const BASE_PROMPT = `You are a world-class ophthalmology oral board examiner, educator, and practicing ophthalmologist. You draw on AAO PPP guidelines, BCSC, Ryan's Retina, Albert & Jakobiec, Walsh & Hoyt, Kanski, landmark RCTs, and surgical textbooks.
@@ -143,7 +146,7 @@ Help with any ophthalmology or exam-prep topic. Be specific, thorough, board-rel
 }
 
 // ---------------------------------------------------------------------------
-// Pre-computed opening messages — show INSTANTLY while AI warms up (or instead).
+// Opening messages
 // ---------------------------------------------------------------------------
 
 function pickRandomCaseWithImage(database: CasesDatabase): CaseData | null {
@@ -165,7 +168,7 @@ function caseOpeningMessage(c: CaseData): string {
 }
 
 // ---------------------------------------------------------------------------
-// Streaming with elapsed-time progress + error-code-aware fallback messages
+// Streaming
 // ---------------------------------------------------------------------------
 
 async function streamViaProxy(
@@ -229,7 +232,7 @@ async function streamViaProxy(
     buffer = lines.pop() || "";
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith(":")) continue; // heartbeat comment
+      if (!trimmed || trimmed.startsWith(":")) continue;
       if (!trimmed.startsWith("data: ")) continue;
       const data = trimmed.slice(6);
       if (data === "[DONE]") continue;
@@ -259,7 +262,7 @@ function friendlyError(code: string, msg: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Markdown rendering: links, bold, italic, AND inline images.
+// Markdown
 // ---------------------------------------------------------------------------
 
 interface MdPart {
@@ -271,7 +274,6 @@ interface MdPart {
 
 function parseMarkdown(text: string): MdPart[] {
   const out: MdPart[] = [];
-  // Split by lines for heading/break detection, but keep inline inside each line
   const lines = text.split("\n");
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
@@ -281,7 +283,6 @@ function parseMarkdown(text: string): MdPart[] {
       if (li < lines.length - 1) out.push({ type: "br", content: "" });
       continue;
     }
-    // Parse inline
     let rem = line;
     while (rem.length > 0) {
       const matches: Array<{ type: MdPart["type"]; index: number; full: string; c: string; href?: string }> = [];
@@ -320,12 +321,15 @@ function renderMarkdown(text: string) {
       {parts.map((part, i) => {
         if (part.type === "image") {
           return (
-            <img
+            <motion.img
               key={i}
               src={part.href}
               alt={part.content || "Clinical image"}
               className="my-2 max-h-96 w-auto rounded-xl border border-slate-700/50 block"
               loading="lazy"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, ease: easeOut }}
             />
           );
         }
@@ -355,21 +359,218 @@ function renderMarkdown(text: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Per-mode micro-icons. Each mode gets a tiny distinct animated glyph.
+// ---------------------------------------------------------------------------
+
+function ModeIcon({ mode, active }: { mode: ExaminerMode; active: boolean }) {
+  // SVG primitives — each mode has a different visual metaphor.
+  const stroke = active ? "#ecfdf5" : "#94a3b8";
+  const accent = active ? "#34d399" : "#475569";
+  const common = { width: 28, height: 28, viewBox: "0 0 28 28", fill: "none" } as const;
+
+  switch (mode) {
+    case "examiner":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Mortarboard / gavel hybrid */}
+          <motion.path
+            d="M4 11l10-5 10 5-10 5-10-5z"
+            stroke={stroke}
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            animate={active ? { y: [0, -1, 0] } : undefined}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <path d="M8 13v4a6 6 0 0012 0v-4" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" />
+          <motion.circle
+            cx={22} cy={20} r={1.5}
+            fill={accent}
+            animate={active ? { scale: [1, 1.3, 1] } : undefined}
+            transition={{ duration: 1.8, repeat: Infinity }}
+          />
+        </svg>
+      );
+    case "viva":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Microphone with sound wave */}
+          <rect x={11} y={5} width={6} height={12} rx={3} stroke={stroke} strokeWidth={1.5} />
+          <path d="M7 12a7 7 0 0014 0" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" />
+          <path d="M14 19v3" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" />
+          {[0, 1, 2].map((i) => (
+            <motion.line
+              key={i}
+              x1={3 + i * 0.5} y1={9 + i}
+              x2={3 + i * 0.5} y2={15 - i}
+              stroke={accent}
+              strokeWidth={1.2}
+              strokeLinecap="round"
+              animate={active ? { opacity: [0.2, 1, 0.2] } : undefined}
+              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15 }}
+            />
+          ))}
+        </svg>
+      );
+    case "quiz":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Lightning bolt */}
+          <motion.path
+            d="M15 3l-8 13h5l-2 9 9-14h-5l1-8z"
+            stroke={stroke}
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            fill={active ? accent : "none"}
+            fillOpacity={active ? 0.25 : 0}
+            animate={active ? { rotate: [0, -3, 3, 0] } : undefined}
+            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </svg>
+      );
+    case "ddx-drill":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Target / crosshair */}
+          <motion.circle
+            cx={14} cy={14} r={9}
+            stroke={stroke} strokeWidth={1.5}
+            animate={active ? { rotate: 360 } : undefined}
+            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+            style={{ transformOrigin: "14px 14px" }}
+          />
+          <circle cx={14} cy={14} r={5} stroke={stroke} strokeWidth={1.5} />
+          <circle cx={14} cy={14} r={1.5} fill={accent} />
+          <path d="M14 2v4M14 22v4M2 14h4M22 14h4" stroke={stroke} strokeWidth={1.2} strokeLinecap="round" />
+        </svg>
+      );
+    case "soap":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Document with lines */}
+          <rect x={6} y={4} width={16} height={20} rx={2} stroke={stroke} strokeWidth={1.5} />
+          {[9, 13, 17, 20].map((y, i) => (
+            <motion.line
+              key={y}
+              x1={9} y1={y} x2={i === 3 ? 16 : 19} y2={y}
+              stroke={i === 0 ? accent : stroke}
+              strokeWidth={1.3}
+              strokeLinecap="round"
+              animate={active ? { pathLength: [0.3, 1, 0.3] } : undefined}
+              transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.2 }}
+            />
+          ))}
+        </svg>
+      );
+    case "case-builder":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Flask bubbling */}
+          <path d="M11 4h6M12 4v6l-5 10a3 3 0 002.6 4.5h8.8A3 3 0 0020 20l-5-10V4" stroke={stroke} strokeWidth={1.5} strokeLinejoin="round" />
+          {[0, 1, 2].map((i) => (
+            <motion.circle
+              key={i}
+              cx={13 + i * 1.5} cy={18}
+              r={0.9}
+              fill={accent}
+              animate={active ? { cy: [20, 10], opacity: [0, 1, 0] } : undefined}
+              transition={{ duration: 2, repeat: Infinity, delay: i * 0.5, ease: "easeOut" }}
+            />
+          ))}
+        </svg>
+      );
+    case "deep-dive":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Open book */}
+          <motion.path
+            d="M4 6c4-2 7-2 10 0 3-2 6-2 10 0v15c-4-2-7-2-10 0-3-2-6-2-10 0V6z"
+            stroke={stroke} strokeWidth={1.5} strokeLinejoin="round"
+            animate={active ? { scale: [1, 1.04, 1] } : undefined}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            style={{ transformOrigin: "14px 14px" }}
+          />
+          <path d="M14 6v15" stroke={stroke} strokeWidth={1.5} />
+        </svg>
+      );
+    case "pearls":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Three pearls on a string */}
+          <path d="M3 10c4 6 18 6 22 0" stroke={stroke} strokeWidth={1.2} strokeLinecap="round" />
+          {[6, 14, 22].map((cx, i) => (
+            <motion.circle
+              key={cx}
+              cx={cx}
+              cy={i === 1 ? 18 : 15}
+              r={3}
+              fill={accent}
+              fillOpacity={0.9}
+              animate={active ? { scale: [1, 1.15, 1] } : undefined}
+              transition={{ duration: 1.6, repeat: Infinity, delay: i * 0.2 }}
+              style={{ transformOrigin: `${cx}px ${i === 1 ? 18 : 15}px` }}
+            />
+          ))}
+        </svg>
+      );
+    case "tutor":
+      return (
+        <svg {...common} aria-hidden>
+          {/* Chalkboard with chalk-drawn √ */}
+          <rect x={3} y={5} width={22} height={16} rx={1.5} stroke={stroke} strokeWidth={1.5} />
+          <motion.path
+            d="M8 14l3 3 6-6"
+            stroke={accent}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+            animate={active ? { pathLength: [0, 1, 1, 0], opacity: [0, 1, 1, 0] } : undefined}
+            transition={{ duration: 3, repeat: Infinity, times: [0, 0.3, 0.7, 1] }}
+          />
+        </svg>
+      );
+    case "free-chat":
+    default:
+      return (
+        <svg {...common} aria-hidden>
+          {/* Chat bubble */}
+          <motion.path
+            d="M5 6h18v13h-7l-5 4v-4H5V6z"
+            stroke={stroke} strokeWidth={1.5} strokeLinejoin="round"
+            animate={active ? { y: [0, -1.5, 0] } : undefined}
+            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          />
+          {[10, 14, 18].map((cx, i) => (
+            <motion.circle
+              key={cx}
+              cx={cx} cy={12.5} r={1}
+              fill={accent}
+              animate={active ? { opacity: [0.3, 1, 0.3] } : undefined}
+              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15 }}
+            />
+          ))}
+        </svg>
+      );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mode card grid data
+// ---------------------------------------------------------------------------
 
 const MODE_CARDS: Array<[ExaminerMode, string, string, string]> = [
-  ["examiner", "🎓 Mock Examiner", "Full ABO-style simulation with a real case + curveballs + 3-domain scoring.", "from-rose-500 to-orange-500"],
-  ["viva", "🎤 Viva Voce", "Verbal pressure; ≤3 sentence answers enforced.", "from-rose-600 to-pink-600"],
-  ["quiz", "⚡ Rapid Quiz", "Rapid-fire questions; instant domain-tagged scoring.", "from-amber-500 to-yellow-500"],
-  ["ddx-drill", "🎯 DDx Drill", "'Give me 5 DDx for...' cycled across subspecialties.", "from-fuchsia-500 to-purple-600"],
-  ["soap", "📋 SOAP Practice", "Write a SOAP note; AI critiques & shows the ideal.", "from-cyan-500 to-blue-600"],
-  ["case-builder", "🧪 Case Builder", "AI generates novel cases tailored to your gaps.", "from-teal-500 to-emerald-600"],
-  ["deep-dive", "📖 Deep Dive", "Structured subspecialty lecture + trials + fatal flaws.", "from-indigo-500 to-violet-600"],
-  ["pearls", "💎 Pearl Dump", "Top 10-15 board pearls + fatal flaws + mnemonics.", "from-amber-400 to-orange-400"],
-  ["tutor", "📚 Teaching Tutor", "Deep explanations with pearls, trials, mnemonics.", "from-emerald-500 to-teal-500"],
-  ["free-chat", "💬 Free Chat", "Open discussion.", "from-primary-500 to-violet-500"],
+  ["examiner", "Mock Examiner", "Full ABO-style simulation with a real case + curveballs + 3-domain scoring.", "from-rose-500 to-orange-500"],
+  ["viva", "Viva Voce", "Verbal pressure; ≤3 sentence answers enforced.", "from-rose-600 to-pink-600"],
+  ["quiz", "Rapid Quiz", "Rapid-fire questions; instant domain-tagged scoring.", "from-amber-500 to-yellow-500"],
+  ["ddx-drill", "DDx Drill", "'Give me 5 DDx for...' cycled across subspecialties.", "from-fuchsia-500 to-purple-600"],
+  ["soap", "SOAP Practice", "Write a SOAP note; AI critiques & shows the ideal.", "from-cyan-500 to-blue-600"],
+  ["case-builder", "Case Builder", "AI generates novel cases tailored to your gaps.", "from-teal-500 to-emerald-600"],
+  ["deep-dive", "Deep Dive", "Structured subspecialty lecture + trials + fatal flaws.", "from-indigo-500 to-violet-600"],
+  ["pearls", "Pearl Dump", "Top 10-15 board pearls + fatal flaws + mnemonics.", "from-amber-400 to-orange-400"],
+  ["tutor", "Teaching Tutor", "Deep explanations with pearls, trials, mnemonics.", "from-emerald-500 to-teal-500"],
+  ["free-chat", "Free Chat", "Open discussion.", "from-primary-500 to-violet-500"],
 ];
 
-// Suggested opening prompts when user hasn't entered a subspecialty focus
 const AUTO_START_PROMPT: Record<ExaminerMode, string> = {
   examiner: "Start the case. I'll walk through my approach.",
   viva: "First question.",
@@ -382,6 +583,68 @@ const AUTO_START_PROMPT: Record<ExaminerMode, string> = {
   tutor: "What topic would you like me to cover? If unsure, start with something high-yield.",
   "free-chat": "Hi! What's on your mind today?",
 };
+
+// ---------------------------------------------------------------------------
+// Sub-components (hooks kept at top of each)
+// ---------------------------------------------------------------------------
+
+function TypingIndicator() {
+  const reduce = useReducedMotion();
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const t0 = performance.now();
+    const id = setInterval(() => setElapsed(Math.round(performance.now() - t0)), 250);
+    return () => clearInterval(id);
+  }, []);
+
+  const slow = elapsed >= 3000;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2.5">
+        <div className="flex items-end gap-1 h-3">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              className="block w-1.5 h-1.5 rounded-full bg-primary-400"
+              style={{ boxShadow: "0 0 8px rgba(52,211,153,0.55)" }}
+              animate={reduce ? undefined : { y: [0, -6, 0] }}
+              transition={{
+                duration: 0.85,
+                repeat: Infinity,
+                delay: i * 0.14,
+                ease: "easeInOut",
+              }}
+            />
+          ))}
+        </div>
+        <motion.span
+          className="text-xs text-slate-300 font-medium"
+          style={{ letterSpacing: reduce ? "0.02em" : undefined }}
+          animate={reduce ? undefined : { letterSpacing: ["0.02em", "0.1em", "0.02em"] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        >
+          Clear Vision AI is reasoning
+        </motion.span>
+      </div>
+      <AnimatePresence>
+        {slow && (
+          <motion.span
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="text-[11px] text-slate-500 italic pl-0.5"
+          >
+            (taking longer than usual…)
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 export default function AIExaminer({ database, onBack, initialCase }: AIExaminerProps) {
   const [mode, setMode] = useState<ExaminerMode>("examiner");
@@ -398,8 +661,8 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reduce = useReducedMotion();
 
-  // List of cases with images for Examiner mode random-pick
   const casesWithImages = useMemo(
     () =>
       database.subspecialties
@@ -462,7 +725,6 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
         abortRef.current.signal
       );
 
-      // If no content streamed and no error shown, surface a generic hint
       if (!gotError && !accumulated.trim()) {
         setError("The AI didn't return any content. Try again or rephrase.");
       }
@@ -477,9 +739,6 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     const sysPrompt = buildSystemPrompt(mode, currentCase, subspecialtyFocus || undefined);
     const systemMsg: Message = { role: "system", content: sysPrompt };
 
-    // Pre-computed opening: for examiner mode, show the case IMMEDIATELY
-    // (image + presentation) before the AI takes over. This avoids any
-    // perceived "nothing is happening" during warm-up.
     const assistantMsgs: Message[] = [];
     let followUpPrompt = AUTO_START_PROMPT[mode];
 
@@ -520,8 +779,6 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     setMessages(initial);
     setStarted(true);
 
-    // Auto-run the follow-up prompt for modes that should stream content
-    // immediately. Tutor/free-chat wait for user input.
     if (mode !== "tutor" && mode !== "free-chat") {
       void streamAndAppend([...initial, { role: "user", content: followUpPrompt }]);
     }
@@ -543,7 +800,6 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
   };
 
   const regenerateLast = async () => {
-    // Strip the last assistant message and re-stream
     const prior = [...messages];
     while (prior.length && prior[prior.length - 1].role !== "user") prior.pop();
     if (prior.length === 0) return;
@@ -571,11 +827,16 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-8 animate-fade-in-up">
+        <motion.div
+          className="max-w-2xl mx-auto px-4 py-8"
+          initial="hidden"
+          animate="show"
+          variants={fadeUp}
+        >
           <div className="glass-card rounded-2xl p-6 sm:p-8">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-3xl mx-auto mb-3 shadow-lg">
-                🤖
+              <div className="mx-auto mb-3 w-16 h-16 flex items-center justify-center">
+                <CVBLogo size={56} />
               </div>
               <h2 className="text-2xl font-bold text-white mb-1">AI Examiner & Tutor</h2>
               <p className="text-sm text-slate-400">
@@ -584,27 +845,70 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               </p>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-2.5 mb-6">
-              {MODE_CARDS.map(([key, label, desc, gradient]) => (
-                <button
-                  key={key}
-                  onClick={() => setMode(key)}
-                  className={`p-3.5 rounded-xl text-left transition-all min-h-[88px] ${
-                    mode === key
-                      ? `bg-gradient-to-r ${gradient} text-white shadow-lg ring-2 ring-white/20`
-                      : "glass-card-light hover:bg-slate-700/40 text-slate-300"
-                  }`}
-                >
-                  <p className="font-semibold text-sm">{label}</p>
-                  <p className={`text-xs mt-1 leading-snug ${mode === key ? "text-white/85" : "text-slate-400"}`}>
-                    {desc}
-                  </p>
-                </button>
-              ))}
-            </div>
+            <motion.div
+              className="grid sm:grid-cols-2 gap-2.5 mb-6"
+              variants={stagger(0.045, 0.05)}
+              initial="hidden"
+              animate="show"
+            >
+              {MODE_CARDS.map(([key, label, desc, gradient]) => {
+                const selected = mode === key;
+                return (
+                  <motion.button
+                    key={key}
+                    variants={fadeUp}
+                    onClick={() => setMode(key)}
+                    whileTap={reduce ? undefined : { scale: 0.97 }}
+                    whileHover={reduce ? undefined : { y: -2 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                    className={`relative p-3.5 rounded-xl text-left min-h-[88px] overflow-hidden ${
+                      selected
+                        ? "bg-slate-900/70 text-white"
+                        : "glass-card-light hover:bg-slate-700/40 text-slate-300"
+                    }`}
+                    aria-pressed={selected}
+                  >
+                    {/* Gradient border sweep when selected */}
+                    {selected && (
+                      <motion.span
+                        aria-hidden
+                        className={`absolute inset-0 rounded-xl bg-gradient-to-r ${gradient} opacity-20`}
+                        initial={reduce ? undefined : { backgroundPosition: "0% 50%" }}
+                        animate={reduce ? undefined : { backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                        transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                        style={{ backgroundSize: "200% 200%" }}
+                      />
+                    )}
+                    {selected && (
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-primary-400/60"
+                        style={{ boxShadow: "0 0 24px -4px rgba(52,211,153,0.45)" }}
+                      />
+                    )}
+                    <div className="relative flex items-start gap-2.5">
+                      <div className={`shrink-0 rounded-lg p-1.5 ${selected ? "bg-primary-500/20" : "bg-slate-800/60"}`}>
+                        <ModeIcon mode={key} active={selected} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm leading-tight">{label}</p>
+                        <p className={`text-xs mt-1 leading-snug ${selected ? "text-slate-200/85" : "text-slate-400"}`}>
+                          {desc}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </motion.div>
 
             {["deep-dive", "case-builder", "ddx-drill", "pearls", "quiz"].includes(mode) && (
-              <div className="mb-5 animate-fade-in">
+              <motion.div
+                className="mb-5"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                transition={{ duration: 0.3 }}
+              >
                 <label className="text-xs text-slate-400 uppercase tracking-wider mb-2 block">
                   Subspecialty focus (optional)
                 </label>
@@ -618,7 +922,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
                     <option key={s.id} value={s.name}>{s.name}</option>
                   ))}
                 </select>
-              </div>
+              </motion.div>
             )}
 
             {mode === "examiner" && (
@@ -653,22 +957,26 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               </div>
             )}
 
-            <button
+            <motion.button
               onClick={startSession}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold text-lg transition-all shadow-lg min-h-[52px]"
+              whileHover={reduce ? undefined : { scale: 1.01 }}
+              whileTap={reduce ? undefined : { scale: 0.98 }}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-primary-500 to-steel-500 hover:from-primary-400 hover:to-steel-400 text-white font-semibold text-lg shadow-lg min-h-[52px]"
             >
               Start Session
-            </button>
+            </motion.button>
             <p className="text-[11px] text-slate-500 text-center mt-3">
               Server-side AI — no setup needed. Primary: Gemini 3 Flash (Ollama fallback).
             </p>
           </div>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   // ─── CHAT INTERFACE ──────────────────────────────────────────────────
+  const visibleMessages = messages.filter((m) => m.role !== "system");
+
   return (
     <div className="min-h-screen flex flex-col">
       <div className="glass-card sticky top-0 z-50 border-b border-slate-700/50">
@@ -706,41 +1014,65 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-          {(() => {
-            const visibleMessages = messages.filter((m) => m.role !== "system");
-            return visibleMessages.map((msg, i) => {
-              const isUser = msg.role === "user";
-              const isPlaceholder = !isUser && !msg.content && isStreaming && i === visibleMessages.length - 1;
-              return (
-                <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[92%] rounded-2xl px-4 py-3 ${
-                      isUser
-                        ? "bg-primary-600 text-white"
-                        : "glass-card-light text-slate-100"
-                    }`}
-                  >
-                    {isPlaceholder ? (
-                      <div className="flex items-center gap-2 text-slate-400 text-sm">
-                        <span className="inline-block w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
-                        <span>
-                          {firstByteMs == null
-                            ? `AI is reasoning${elapsedMs >= 1000 ? ` · ${(elapsedMs / 1000).toFixed(1)}s` : "…"}`
-                            : `Streaming · ${((elapsedMs - firstByteMs) / 1000).toFixed(1)}s`}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">
-                        {renderMarkdown(msg.content)}
-                      </div>
-                    )}
+          {visibleMessages.map((msg, i) => {
+            const isUser = msg.role === "user";
+            const isPlaceholder = !isUser && !msg.content && isStreaming && i === visibleMessages.length - 1;
+            return (
+              <motion.div
+                key={i}
+                initial={reduce ? false : { opacity: 0, y: 8, x: isUser ? 8 : -8 }}
+                animate={{ opacity: 1, y: 0, x: 0 }}
+                transition={{ duration: 0.4, ease: easeOut }}
+                className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}
+              >
+                {!isUser && (
+                  <div className="shrink-0 mb-1 hidden sm:block">
+                    <CVBLogo size={28} animate={false} />
                   </div>
+                )}
+                <div
+                  className={`max-w-[88%] rounded-2xl px-4 py-3 ${
+                    isUser
+                      ? "bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-[0_4px_20px_-6px_rgba(4,121,98,0.5)]"
+                      : "bg-slate-900/60 backdrop-blur border border-slate-700/40 text-slate-100"
+                  }`}
+                  style={
+                    isUser
+                      ? {
+                          backgroundImage:
+                            "linear-gradient(135deg, #047962 0%, #065f50 60%, #064e3b 100%), radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06) 0%, transparent 50%)",
+                          backgroundBlendMode: "overlay",
+                        }
+                      : undefined
+                  }
+                >
+                  {isPlaceholder ? (
+                    <TypingIndicator />
+                  ) : (
+                    <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">
+                      {renderMarkdown(msg.content)}
+                    </div>
+                  )}
+                  {!isPlaceholder && !isUser && isStreaming && i === visibleMessages.length - 1 && firstByteMs != null && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500">
+                      <motion.span
+                        className="inline-block w-1 h-1 rounded-full bg-primary-400"
+                        animate={reduce ? undefined : { opacity: [0.3, 1, 0.3] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      />
+                      streaming · {((elapsedMs - firstByteMs) / 1000).toFixed(1)}s
+                    </div>
+                  )}
                 </div>
-              );
-            });
-          })()}
+              </motion.div>
+            );
+          })}
           {error && (
-            <div className="flex justify-start">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
               <div className="max-w-[92%] rounded-2xl px-4 py-3 bg-rose-500/10 border border-rose-500/40 text-rose-200 text-sm">
                 {error}
                 <button
@@ -751,7 +1083,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
                   Retry
                 </button>
               </div>
-            </div>
+            </motion.div>
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -777,22 +1109,33 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               aria-label="Your message"
             />
             {isStreaming ? (
-              <button
+              <motion.button
                 onClick={stopStreaming}
-                className="px-5 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm min-h-[44px]"
+                whileTap={reduce ? undefined : { scale: 0.95 }}
+                className="relative px-5 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm min-h-[44px]"
                 aria-label="Stop generation"
               >
-                Stop
-              </button>
+                {!reduce && (
+                  <motion.span
+                    aria-hidden
+                    className="absolute inset-0 rounded-xl ring-2 ring-rose-400"
+                    animate={{ opacity: [0.6, 0, 0.6], scale: [1, 1.08, 1] }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
+                <span className="relative">Stop</span>
+              </motion.button>
             ) : (
-              <button
+              <motion.button
                 onClick={sendMessage}
                 disabled={!input.trim()}
+                whileHover={reduce || !input.trim() ? undefined : { scale: 1.03 }}
+                whileTap={reduce || !input.trim() ? undefined : { scale: 0.96 }}
                 className="px-5 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium text-sm min-h-[44px]"
                 aria-label="Send message"
               >
                 Send
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
