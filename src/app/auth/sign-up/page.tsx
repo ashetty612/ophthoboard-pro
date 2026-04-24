@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import AuthShowcase from "@/components/AuthShowcase";
@@ -18,7 +19,8 @@ import {
 import { easeOut, fadeUp } from "@/lib/motion";
 
 export default function SignUpPage() {
-  const { supabaseEnabled, signUp } = useAuth();
+  const { mode: authMode, signUp } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -51,25 +53,17 @@ export default function SignUpPage() {
         setError(err);
       }
     } else {
-      setSuccess(true);
+      // Local mode: account is usable immediately, no email confirmation.
+      // Supabase mode: user must click emailed link, show success screen.
+      if (authMode === "local") {
+        router.push("/");
+      } else {
+        setSuccess(true);
+      }
     }
   }
 
-  if (!supabaseEnabled) {
-    return (
-      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 p-6">
-        <div
-          className="pointer-events-none absolute inset-0"
-          aria-hidden
-          style={{
-            background:
-              "radial-gradient(60% 40% at 30% 30%, rgba(4,121,98,0.18), transparent 70%), radial-gradient(60% 40% at 70% 70%, rgba(52,120,150,0.15), transparent 70%)",
-          }}
-        />
-        <NotConfiguredCard flavor="sign-up" />
-      </div>
-    );
-  }
+  // Local mode is now a first-class path — no "not configured" dead-end.
 
   // Password strength — simple indicator (length + classes)
   const pwScore = (() => {

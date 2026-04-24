@@ -16,6 +16,9 @@ import AuthButton from "@/components/AuthButton";
 import Hero from "@/components/Hero";
 import AuroraBackground from "@/components/AuroraBackground";
 import CVBLogo from "@/components/CVBLogo";
+import LensleyAvatar from "@/components/brand/LensleyAvatar";
+import EyesaacAvatar from "@/components/brand/EyesaacAvatar";
+import CVELogo from "@/components/brand/CVELogo";
 import CramSheet from "@/components/CramSheet";
 import DueTodayView from "@/components/DueTodayView";
 import RapidFireDrill from "@/components/RapidFireDrill";
@@ -1127,20 +1130,34 @@ export default function Home() {
           </div>
         )}
 
-        {/* Footer */}
-        <footer className="text-center py-10">
-          <div className="divider-glow mb-6" />
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <CVBLogo size={22} animate={false} />
-            <span className="text-xs text-slate-400 font-medium tracking-wide">
-              Clear Vision <span className="font-[family-name:var(--font-fraunces)] italic">Boards</span>
-              <span className="text-slate-500"> · by Clear Vision Education</span>
-            </span>
+        {/* Footer — CVE logo + small mascot silhouettes for brand warmth */}
+        <footer className="pt-14 pb-10">
+          <div className="divider-glow mb-8" />
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <CVELogo size={80} wordmark={false} className="opacity-90" />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-white tracking-tight">
+                  Clear Vision <span className="font-[family-name:var(--font-fraunces)] italic text-primary-300">Boards</span>
+                </span>
+                <span className="text-[11px] text-slate-400 uppercase tracking-[0.18em]">
+                  by Clear Vision Education
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 opacity-70">
+              <div className="h-10 w-10 overflow-hidden rounded-full ring-1 ring-primary-500/20 bg-gradient-to-br from-slate-800 to-slate-900">
+                <LensleyAvatar size={40} />
+              </div>
+              <div className="h-10 w-10 overflow-hidden rounded-full ring-1 ring-steel-500/20 bg-gradient-to-br from-slate-800 to-slate-900">
+                <EyesaacAvatar size={40} />
+              </div>
+            </div>
           </div>
-          <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+          <p className="text-[11px] text-slate-500 max-w-md mt-6 text-center sm:text-left">
             For educational purposes only. Not affiliated with the American Board of Ophthalmology.
           </p>
-          <p className="text-[10px] text-slate-600 mt-2 font-mono">
+          <p className="text-[10px] text-slate-600 mt-2 font-mono text-center sm:text-left">
             v{process.env.NEXT_PUBLIC_BUILD_VERSION || "0.0.0"}
             {" · "}
             {process.env.NEXT_PUBLIC_GIT_SHA || "dev"}

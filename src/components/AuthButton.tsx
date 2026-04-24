@@ -8,9 +8,7 @@ import { useAuth } from "@/lib/auth-context";
  * Supabase is not configured (app-only mode).
  */
 export default function AuthButton() {
-  const { supabaseEnabled, user, signOut } = useAuth();
-
-  if (!supabaseEnabled) return null;
+  const { mode, user, signOut } = useAuth();
 
   if (!user) {
     return (
@@ -27,16 +25,24 @@ export default function AuthButton() {
     );
   }
 
-  const initial = (user.email || "?").charAt(0).toUpperCase();
+  const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
   return (
     <div className="inline-flex items-center gap-2">
       <span
-        className="w-7 h-7 rounded-full bg-primary-600 text-white text-xs font-semibold flex items-center justify-center"
-        title={user.email || ""}
-        aria-label={`Signed in as ${user.email}`}
+        className="w-7 h-7 rounded-full bg-primary-600 text-white text-xs font-semibold flex items-center justify-center ring-1 ring-primary-400/40"
+        title={`${user.email || ""} (${mode === "supabase" ? "cloud-synced" : "local"})`}
+        aria-label={`Signed in as ${user.email} via ${mode}`}
       >
         {initial}
       </span>
+      {mode === "local" && (
+        <span
+          className="hidden sm:inline-block text-[9px] uppercase tracking-[0.18em] text-slate-500"
+          title="Local account — works offline; enable Supabase for cross-device sync"
+        >
+          Local
+        </span>
+      )}
       <button
         onClick={() => void signOut()}
         className="text-xs text-slate-400 hover:text-white transition-colors"

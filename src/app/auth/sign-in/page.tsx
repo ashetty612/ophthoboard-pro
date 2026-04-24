@@ -19,23 +19,26 @@ import {
 import { easeOut, fadeUp } from "@/lib/motion";
 
 export default function SignInPage() {
-  const { supabaseEnabled, signInWithPassword, signInWithOtp } = useAuth();
+  const { mode: authMode, signInWithPassword, signInWithOtp } = useAuth();
   const router = useRouter();
   const reduce = useReducedMotion();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+  // Magic-link is only available on the Supabase path
   const [mode, setMode] = useState<"password" | "magic">("password");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const magicAvailable = authMode === "supabase";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setInfo("");
     setLoading(true);
-    if (mode === "password") {
+    if (mode === "password" || !magicAvailable) {
       const { error: err } = await signInWithPassword(email, password);
       setLoading(false);
       if (err) setError(err);
@@ -46,22 +49,6 @@ export default function SignInPage() {
       if (err) setError(err);
       else setInfo("Check your email for the magic sign-in link.");
     }
-  }
-
-  if (!supabaseEnabled) {
-    return (
-      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 p-6">
-        <div
-          className="pointer-events-none absolute inset-0"
-          aria-hidden
-          style={{
-            background:
-              "radial-gradient(60% 40% at 30% 30%, rgba(4,121,98,0.18), transparent 70%), radial-gradient(60% 40% at 70% 70%, rgba(52,120,150,0.15), transparent 70%)",
-          }}
-        />
-        <NotConfiguredCard flavor="sign-in" />
-      </div>
-    );
   }
 
   return (

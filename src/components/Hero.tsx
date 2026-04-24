@@ -5,6 +5,8 @@ import { fadeUp, stagger, hoverPress, pulseBadge } from "@/lib/motion";
 import SpotlightCursor from "./SpotlightCursor";
 import CountUp from "./CountUp";
 import CVBLogo from "./CVBLogo";
+import LensleyAvatar from "./brand/LensleyAvatar";
+import EyesaacAvatar from "./brand/EyesaacAvatar";
 
 /**
  * Clear Vision Boards hero section.
@@ -81,11 +83,55 @@ export default function Hero({ stats, onStartRandom, onOpenAI, daysUntilExam }: 
           variants={fadeUp}
           className="mx-auto mt-5 max-w-2xl text-center text-[15px] sm:text-base leading-relaxed text-slate-300"
         >
-          The ophthalmology oral board prep engine from{" "}
-          <span className="text-primary-300 font-medium">Clear Vision Education</span>. Real-time AI
-          examiner, 432 image-backed PMPs, 27 fatal-flaw safety nets — tuned exactly to the ABO
-          8-element framework.
+          400+ oral-board-style cases with personal tutoring from{" "}
+          <span className="text-primary-300 font-semibold">Lensley</span> and{" "}
+          <span className="text-primary-300 font-semibold">Eyesaac</span> themselves.
         </motion.p>
+
+        {/* Mascots on either side of the subhead — quiet, labeled, framed */}
+        <motion.div
+          variants={fadeUp}
+          className="mx-auto mt-8 flex max-w-2xl items-end justify-center gap-4 sm:gap-10"
+        >
+          <motion.div
+            animate={reduce ? undefined : { y: [0, -6, 0] }}
+            transition={reduce ? undefined : { duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            className="flex flex-col items-center"
+          >
+            <div className="relative rounded-full bg-gradient-to-br from-primary-500/20 to-steel-500/20 p-1.5 ring-1 ring-primary-500/30 shadow-[0_14px_40px_-14px_rgba(4,121,98,0.55)]">
+              <div className="rounded-full overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900">
+                <LensleyAvatar size={96} />
+              </div>
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 rounded-full bg-primary-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-white shadow">
+                Lensley
+              </span>
+            </div>
+            <p className="mt-5 text-[10px] text-slate-500 uppercase tracking-[0.18em]">The Attending</p>
+          </motion.div>
+
+          {/* Tiny between-mascots accent: a grad cap glyph nodding to CVE */}
+          <div className="flex h-24 items-center">
+            <span className="text-3xl opacity-30 select-none" aria-hidden>
+              ✦
+            </span>
+          </div>
+
+          <motion.div
+            animate={reduce ? undefined : { y: [0, -6, 0] }}
+            transition={reduce ? undefined : { duration: 5.4, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
+            className="flex flex-col items-center"
+          >
+            <div className="relative rounded-full bg-gradient-to-br from-primary-500/20 to-steel-500/20 p-1.5 ring-1 ring-primary-500/30 shadow-[0_14px_40px_-14px_rgba(52,120,150,0.55)]">
+              <div className="rounded-full overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900">
+                <EyesaacAvatar size={96} />
+              </div>
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 rounded-full bg-steel-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-white shadow">
+                Eyesaac
+              </span>
+            </div>
+            <p className="mt-5 text-[10px] text-slate-500 uppercase tracking-[0.18em]">The Student</p>
+          </motion.div>
+        </motion.div>
 
         {/* Primary CTAs */}
         <motion.div

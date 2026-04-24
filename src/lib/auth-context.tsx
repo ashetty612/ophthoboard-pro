@@ -2,99 +2,159 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { isSupabaseEnabled, supabase } from "./supabase/client";
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session as SupabaseSession, User } from "@supabase/supabase-js";
+import * as LocalAuth from "./local-auth";
+
+/**
+ * Unified auth context.
+ *
+ *  Flow:
+ *    - If Supabase env vars are configured → use Supabase as the source of
+ *      truth. Cross-device sync, server-verified sessions.
+ *    - Otherwise → fall back to a local PBKDF2-hashed account stored in
+ *      localStorage. Works on any device offline. Progress is scoped to
+ *      the local user.
+ *
+ *  From the consumer's perspective the API is identical; only `mode`
+ *  and `user.displayName` differ when in local mode.
+ */
+
+export type AuthMode = "supabase" | "local";
+
+interface UnifiedUser {
+  id: string;
+  email: string;
+  displayName?: string;
+}
 
 interface AuthState {
   supabaseEnabled: boolean;
-  session: Session | null;
-  user: User | null;
+  mode: AuthMode;
+  user: UnifiedUser | null;
   loading: boolean;
   signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>;
   signInWithOtp: (email: string) => Promise<{ error?: string }>;
-  signUp: (email: string, password: string) => Promise<{ error?: string }>;
+  signUp: (email: string, password: string, displayName?: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 }
 
 const AuthCtx = createContext<AuthState>({
   supabaseEnabled: false,
-  session: null,
+  mode: "local",
   user: null,
   loading: false,
   signInWithPassword: async () => ({ error: "Auth not configured" }),
-  signInWithOtp: async () => ({ error: "Auth not configured" }),
+  signInWithOtp: async () => ({ error: "Magic link requires Supabase. Use password sign-in." }),
   signUp: async () => ({ error: "Auth not configured" }),
   signOut: async () => {},
 });
 
+function toUnified(u: User | LocalAuth.Session | null): UnifiedUser | null {
+  if (!u) return null;
+  if ("userId" in u) {
+    return { id: u.userId, email: u.email, displayName: u.displayName };
+  }
+  return { id: u.id, email: u.email || "", displayName: (u.user_metadata as { displayName?: string } | undefined)?.displayName };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const enabled = isSupabaseEnabled();
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(enabled);
+  const mode: AuthMode = enabled ? "supabase" : "local";
+  const [supabaseSession, setSupabaseSession] = useState<SupabaseSession | null>(null);
+  const [localSession, setLocalSession] = useState<LocalAuth.Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
+  // Rehydrate session on mount
   useEffect(() => {
-    if (!enabled) return;
-    const sb = supabase();
-    if (!sb) return;
-
-    // Fetch existing session
-    sb.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    let cancelled = false;
+    if (enabled) {
+      const sb = supabase();
+      if (!sb) { setLoading(false); return; }
+      sb.auth.getSession().then(({ data }) => {
+        if (cancelled) return;
+        setSupabaseSession(data.session);
+        setLoading(false);
+      });
+      const { data: sub } = sb.auth.onAuthStateChange((_event, s) => setSupabaseSession(s));
+      return () => {
+        cancelled = true;
+        sub.subscription.unsubscribe();
+      };
+    } else {
+      setLocalSession(LocalAuth.getSession());
       setLoading(false);
-    });
-
-    // Subscribe to auth changes
-    const { data: sub } = sb.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-    });
-    return () => {
-      sub.subscription.unsubscribe();
-    };
+    }
   }, [enabled]);
 
   const value = useMemo<AuthState>(() => {
+    const user = enabled
+      ? toUnified(supabaseSession?.user ?? null)
+      : toUnified(localSession);
+
     return {
       supabaseEnabled: enabled,
-      session,
-      user: session?.user ?? null,
+      mode,
+      user,
       loading,
       async signInWithPassword(email, password) {
-        const sb = supabase();
-        if (!sb) return { error: "Auth not configured" };
-        const { error } = await sb.auth.signInWithPassword({ email, password });
-        return { error: error?.message };
+        if (enabled) {
+          const sb = supabase();
+          if (!sb) return { error: "Auth not configured" };
+          const { error } = await sb.auth.signInWithPassword({ email, password });
+          return { error: error?.message };
+        }
+        const res = await LocalAuth.signIn(email, password);
+        if (!res.ok) return { error: res.error };
+        setLocalSession(res.session);
+        return {};
       },
       async signInWithOtp(email) {
-        const sb = supabase();
-        if (!sb) return { error: "Auth not configured" };
-        const { error } = await sb.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo:
-              typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
-          },
-        });
-        return { error: error?.message };
+        if (enabled) {
+          const sb = supabase();
+          if (!sb) return { error: "Auth not configured" };
+          const { error } = await sb.auth.signInWithOtp({
+            email,
+            options: {
+              emailRedirectTo:
+                typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+            },
+          });
+          return { error: error?.message };
+        }
+        return { error: "Magic link requires cloud accounts. Use a password in local mode." };
       },
-      async signUp(email, password) {
-        const sb = supabase();
-        if (!sb) return { error: "Auth not configured" };
-        const { error } = await sb.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo:
-              typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
-          },
-        });
-        return { error: error?.message };
+      async signUp(email, password, displayName) {
+        if (enabled) {
+          const sb = supabase();
+          if (!sb) return { error: "Auth not configured" };
+          const { error } = await sb.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { displayName },
+              emailRedirectTo:
+                typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+            },
+          });
+          return { error: error?.message };
+        }
+        const res = await LocalAuth.signUp(email, password, displayName);
+        if (!res.ok) return { error: res.error };
+        setLocalSession(res.session);
+        return {};
       },
       async signOut() {
-        const sb = supabase();
-        if (!sb) return;
-        await sb.auth.signOut();
+        if (enabled) {
+          const sb = supabase();
+          if (sb) await sb.auth.signOut();
+          setSupabaseSession(null);
+        } else {
+          LocalAuth.signOut();
+          setLocalSession(null);
+        }
       },
     };
-  }, [enabled, session, loading]);
+  }, [enabled, mode, supabaseSession, localSession, loading]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

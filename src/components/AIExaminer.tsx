@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { CasesDatabase, CaseData } from "@/lib/types";
 import CVBLogo from "./CVBLogo";
+import LensleyAvatar from "./brand/LensleyAvatar";
+import EyesaacAvatar from "./brand/EyesaacAvatar";
 import { fadeUp, stagger, easeOut } from "@/lib/motion";
 
 /**
@@ -835,13 +837,28 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
         >
           <div className="glass-card rounded-2xl p-6 sm:p-8">
             <div className="text-center mb-6">
-              <div className="mx-auto mb-3 w-16 h-16 flex items-center justify-center">
-                <CVBLogo size={56} />
+              {/* Mascot duo — Lensley (attending) examines on the left, Eyesaac
+                  (student) celebrates on the right. Subtle labels so users
+                  learn the cast. */}
+              <div className="mx-auto mb-4 flex items-end justify-center gap-3">
+                <div className="flex flex-col items-center">
+                  <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-slate-800 to-slate-900 ring-1 ring-primary-500/30">
+                    <LensleyAvatar size={56} />
+                  </div>
+                  <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.15em] text-primary-300">Lensley</span>
+                </div>
+                <div className="text-slate-600 text-lg mb-3" aria-hidden>✦</div>
+                <div className="flex flex-col items-center">
+                  <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-slate-800 to-slate-900 ring-1 ring-steel-500/30">
+                    <EyesaacAvatar size={56} />
+                  </div>
+                  <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.15em] text-steel-300">Eyesaac</span>
+                </div>
               </div>
               <h2 className="text-2xl font-bold text-white mb-1">AI Examiner & Tutor</h2>
               <p className="text-sm text-slate-400">
-                Grounded in 27 fatal-flaw safety nets, 46 landmark trials, 25 AAO PPPs.
-                Cites briefly; explains WHY+HOW; ends with 2-3 pearls.
+                Lensley grills you like a real ABO examiner. Eyesaac walks you through every
+                teaching mode. Grounded in 27 fatal flaws, 46 trials, 25 AAO PPPs.
               </p>
             </div>
 
@@ -1027,7 +1044,15 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
               >
                 {!isUser && (
                   <div className="shrink-0 mb-1 hidden sm:block">
-                    <CVBLogo size={28} animate={false} />
+                    {/* Lensley narrates examiner-style modes (mock exam, viva, quiz, ddx-drill);
+                        Eyesaac hosts teaching/case-builder/pearls/tutor. Matches mascot personas. */}
+                    <div className="h-10 w-10 overflow-hidden rounded-full ring-1 ring-primary-500/35 bg-gradient-to-br from-slate-800 to-slate-900 shadow-[0_6px_20px_-6px_rgba(4,121,98,0.45)]">
+                      {(["examiner", "viva", "quiz", "ddx-drill"].includes(mode)) ? (
+                        <LensleyAvatar size={40} />
+                      ) : (
+                        <EyesaacAvatar size={40} />
+                      )}
+                    </div>
                   </div>
                 )}
                 <div
