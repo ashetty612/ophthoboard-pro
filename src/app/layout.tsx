@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Inter, Space_Grotesk, JetBrains_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import AuroraBackground from "@/components/AuroraBackground";
 import { AuthProvider } from "@/lib/auth-context";
 
 const inter = Inter({
@@ -25,6 +26,17 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+// Fraunces: editorial serif for the italic-emph word in display headings —
+// signature Clear Vision treatment. Uses the variable font's optical-size
+// axis for larger hero display.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-fraunces",
+  display: "swap",
+});
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -32,15 +44,16 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "OphthoBoard Pro - Ophthalmology Oral Boards Study Tool",
-  description: "Interactive ophthalmology oral board exam preparation with ABO-style scoring, 350+ cases, AI examiner, PPP guidelines, and progress tracking",
+  title: "Clear Vision Boards — Clear the Boards.",
+  description:
+    "The ABO oral boards prep system, by Clear Vision Education. 432 interactive cases, real-time AI examiner, 25 AAO PPPs, 46 landmark trials, and 27 fatal-flaw safety nets — all tuned to the 8-element PMP framework.",
   openGraph: {
-    title: "OphthoBoard Pro",
-    description: "Master your ophthalmology oral boards with 350+ interactive cases, AI examiner, and ABO-style scoring",
+    title: "Clear Vision Boards",
+    description: "Clear the Boards. The definitive ABO oral boards prep, by Clear Vision Education.",
     type: "website",
   },
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👁</text></svg>",
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%23047962'/><stop offset='100%' stop-color='%23347896'/></linearGradient></defs><circle cx='50' cy='50' r='45' fill='url(%23g)'/><circle cx='50' cy='50' r='16' fill='%23020a13'/><circle cx='44' cy='44' r='5' fill='%23ffffff' opacity='0.7'/></svg>",
   },
 };
 
@@ -50,8 +63,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${fraunces.variable}`}>
       <body className="antialiased">
+        <AuroraBackground />
         <AuthProvider>
           <ErrorBoundary>
             {children}

@@ -13,6 +13,9 @@ import FlashcardMode from "@/components/FlashcardMode";
 import AIExaminer from "@/components/AIExaminer";
 import PPPBrowser from "@/components/PPPBrowser";
 import AuthButton from "@/components/AuthButton";
+import Hero from "@/components/Hero";
+import AuroraBackground from "@/components/AuroraBackground";
+import CVBLogo from "@/components/CVBLogo";
 import CramSheet from "@/components/CramSheet";
 import DueTodayView from "@/components/DueTodayView";
 import RapidFireDrill from "@/components/RapidFireDrill";
@@ -478,10 +481,14 @@ export default function Home() {
       <header className="border-b border-slate-800/80 glass-card sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <EyeLogo size={36} />
+            <CVBLogo size={36} />
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-white tracking-tight">OphthoBoard</h1>
-              <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] hidden sm:block">Oral Boards Mastery</p>
+              <h1 className="text-base sm:text-lg font-bold text-white tracking-tight leading-none">
+                Clear Vision <span className="font-[family-name:var(--font-fraunces)] italic text-primary-300">Boards</span>
+              </h1>
+              <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] hidden sm:block mt-0.5">
+                by Clear Vision Education
+              </p>
             </div>
           </div>
           <nav aria-label="Primary" className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto">
@@ -627,42 +634,43 @@ export default function Home() {
           </div>
         )}
 
-        {/* Hero Section */}
-        <div className="mb-14 animate-fade-in-up">
-          <div className="flex flex-col items-center text-center">
-            <p className="text-[11px] text-primary-400/80 uppercase tracking-[0.3em] font-medium mb-4">
-              Board Preparation Platform
-            </p>
-            <EmphHeading
-              level={2}
-              className="text-4xl sm:text-5xl font-bold text-white mb-4 tracking-tight leading-tight"
-            >
-              Master your <br />
-              <em>Oral Boards</em>
-            </EmphHeading>
-            <p className="text-slate-400 text-base max-w-lg mx-auto leading-relaxed">
-              {totalActiveCases} interactive cases across 5 subspecialties.
-              ABO-style scoring, AI examiner, and detailed progress tracking.
-            </p>
-          </div>
-        </div>
+        {/* Hero — Clear Vision Boards */}
+        <Hero
+          stats={{
+            cases: totalActiveCases,
+            images: 404,
+            modes: 19,
+            trials: 46,
+          }}
+          daysUntilExam={daysUntilExam}
+          onStartRandom={() => {
+            const all = database.subspecialties.flatMap((s) =>
+              s.cases.filter((c) => c.questions.length > 0)
+            );
+            if (all.length === 0) return;
+            handleSelectCase(all[Math.floor(Math.random() * all.length)]);
+          }}
+          onOpenAI={() => setCurrentView("ai-examiner")}
+        />
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
-          {[
-            { label: "Completed", value: progress.totalCasesAttempted, suffix: `/${totalActiveCases}`, color: "text-primary-400" },
-            { label: "Average", value: `${progress.averageScore}`, suffix: "%", color: progress.averageScore >= 70 ? "text-emerald-400" : "text-amber-400" },
-            { label: "Best Score", value: `${progress.bestScore}`, suffix: "%", color: "text-emerald-400" },
-            { label: "Streak", value: streak.current, suffix: streak.current === 1 ? " day" : " days", color: "text-violet-400" },
-          ].map((stat) => (
-            <div key={stat.label} className="glass-card rounded-xl p-4 text-center">
-              <p className={`stat-number text-2xl font-bold ${stat.color}`}>
-                {stat.value}<span className="text-sm text-slate-400">{stat.suffix}</span>
-              </p>
-              <p className="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">{stat.label}</p>
-            </div>
-          ))}
-        </div>
+        {/* User progress row — kept but visually subordinate to the hero */}
+        {progress.totalCasesAttempted > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
+            {[
+              { label: "Completed", value: progress.totalCasesAttempted, suffix: `/${totalActiveCases}`, color: "text-primary-400" },
+              { label: "Average", value: `${progress.averageScore}`, suffix: "%", color: progress.averageScore >= 70 ? "text-emerald-400" : "text-amber-400" },
+              { label: "Best Score", value: `${progress.bestScore}`, suffix: "%", color: "text-emerald-400" },
+              { label: "Streak", value: streak.current, suffix: streak.current === 1 ? " day" : " days", color: "text-violet-400" },
+            ].map((stat) => (
+              <div key={stat.label} className="glass-card rounded-xl p-4 text-center">
+                <p className={`stat-number text-2xl font-bold ${stat.color}`}>
+                  {stat.value}<span className="text-sm text-slate-400">{stat.suffix}</span>
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Overall Progress Bar */}
         {progress.totalCasesAttempted > 0 && (
@@ -1048,8 +1056,11 @@ export default function Home() {
         <footer className="text-center py-10">
           <div className="divider-glow mb-6" />
           <div className="flex items-center justify-center gap-2 mb-2">
-            <EyeLogo size={20} />
-            <span className="text-xs text-slate-400 font-medium tracking-wide">OphthoBoard Pro</span>
+            <CVBLogo size={22} animate={false} />
+            <span className="text-xs text-slate-400 font-medium tracking-wide">
+              Clear Vision <span className="font-[family-name:var(--font-fraunces)] italic">Boards</span>
+              <span className="text-slate-500"> · by Clear Vision Education</span>
+            </span>
           </div>
           <p className="text-[11px] text-slate-500 max-w-md mx-auto">
             For educational purposes only. Not affiliated with the American Board of Ophthalmology.
