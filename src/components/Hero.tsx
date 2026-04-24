@@ -106,7 +106,8 @@ export default function Hero({ stats, onStartRandom, onOpenAI, daysUntilExam }: 
                 Lensley
               </span>
             </div>
-            <p className="mt-5 text-[10px] text-slate-500 uppercase tracking-[0.18em]">The Attending</p>
+            <p className="mt-5 text-[10px] text-slate-500 uppercase tracking-[0.18em]">Chief Examiner</p>
+            <p className="mt-1 text-[10px] text-slate-600">Asks the questions the board will ask.</p>
           </motion.div>
 
           {/* Tiny between-mascots accent: a grad cap glyph nodding to CVE */}
@@ -129,7 +130,8 @@ export default function Hero({ stats, onStartRandom, onOpenAI, daysUntilExam }: 
                 Eyesaac
               </span>
             </div>
-            <p className="mt-5 text-[10px] text-slate-500 uppercase tracking-[0.18em]">The Student</p>
+            <p className="mt-5 text-[10px] text-slate-500 uppercase tracking-[0.18em]">Co-Resident</p>
+            <p className="mt-1 text-[10px] text-slate-600">Catches the zebras before you do.</p>
           </motion.div>
         </motion.div>
 

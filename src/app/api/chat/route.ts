@@ -88,7 +88,8 @@ const sseDone = () => enc.encode("data: [DONE]\n\n");
  */
 function toGeminiBody(
   messages: IncomingMessage[],
-  temperature: number
+  temperature: number,
+  maxTokens: number
 ): unknown {
   const sys = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
   const conv = messages.filter((m) => m.role !== "system");
@@ -105,7 +106,7 @@ function toGeminiBody(
     contents,
     generationConfig: {
       temperature,
-      maxOutputTokens: 2500,
+      maxOutputTokens: maxTokens,
       responseModalities: ["TEXT"],
     },
     // safetySettings loose for medical content (education)
@@ -231,6 +232,7 @@ async function pumpOllama(
 async function callGemini(
   messages: IncomingMessage[],
   temperature: number,
+  maxTokens: number,
   signal: AbortSignal
 ): Promise<Response> {
   const key = process.env.GOOGLE_API_KEY || "";
@@ -238,7 +240,7 @@ async function callGemini(
   return fetch(GEMINI_ENDPOINT(GEMINI_MODEL, key), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(toGeminiBody(messages, temperature)),
+    body: JSON.stringify(toGeminiBody(messages, temperature, maxTokens)),
     signal,
   });
 }
@@ -247,6 +249,7 @@ async function callOllama(
   model: string,
   messages: IncomingMessage[],
   temperature: number,
+  maxTokens: number,
   signal: AbortSignal
 ): Promise<Response> {
   const key = process.env.OLLAMA_API_KEY || "";
@@ -258,10 +261,51 @@ async function callOllama(
       model,
       messages,
       stream: true,
-      options: { temperature },
+      options: {
+        temperature,
+        // Ollama uses num_predict; Gemini uses maxOutputTokens.
+        num_predict: maxTokens,
+      },
     }),
     signal,
   });
+}
+
+/** Per-mode ceilings on model output length. Keeps Gemini fast + cheap for
+ *  terse modes (viva / pearls) while still giving deep-dive enough headroom. */
+function maxTokensForMode(mode?: string | null): number {
+  switch (mode) {
+    case "viva":
+    case "quiz":
+    case "ddx-drill":
+      return 900;
+    case "pearls":
+      return 1400;
+    case "soap":
+    case "case-builder":
+      return 1800;
+    case "examiner":
+    case "tutor":
+      return 2400;
+    case "deep-dive":
+      return 3200;
+    case "free-chat":
+    default:
+      return 2000;
+  }
+}
+
+/** Smart context trimming. Always keeps system messages (prompts / retrieval
+ *  context). For conversational turns, keeps the first 2 assistant turns
+ *  (session greeting + case open) plus the last 14 turns — enough for the
+ *  model to follow the thread without sending megabytes on long sessions. */
+function trimContext(messages: IncomingMessage[]): IncomingMessage[] {
+  const systems = messages.filter((m) => m.role === "system");
+  const convo = messages.filter((m) => m.role !== "system");
+  if (convo.length <= 16) return [...systems, ...convo];
+  const head = convo.slice(0, 2);
+  const tail = convo.slice(-14);
+  return [...systems, ...head, ...tail];
 }
 
 // --- Route handler --------------------------------------------------------
@@ -283,6 +327,8 @@ export async function POST(request: NextRequest) {
     temperature?: number;
     deep_thinking?: boolean;
     provider?: "gemini" | "ollama";
+    /** Examiner mode (examiner / viva / quiz / pearls / …). Tunes max tokens. */
+    mode?: string;
   } = {};
   try { body = await request.json(); }
   catch {
@@ -294,10 +340,11 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: { code: "bad_request", message: "Messages array required." } }, { status: 400 });
   }
 
-  const normalized: IncomingMessage[] = messages.slice(-40).map((m) => ({
+  const raw: IncomingMessage[] = messages.slice(-40).map((m) => ({
     role: m.role,
     content: (m.content || "").toString().slice(0, 20000),
   }));
+  const normalized = trimContext(raw);
 
   // Retrieval grounding
   const lastUser = [...normalized].reverse().find((m) => m.role === "user");
@@ -313,6 +360,7 @@ export async function POST(request: NextRequest) {
 
   const showThinking = body.think === true;
   const temperature = typeof body.temperature === "number" ? body.temperature : 0.4;
+  const maxTokens = maxTokensForMode(body.mode);
 
   // Provider cascade. Gemini primary. Ollama fallback if explicitly requested
   // (deep_thinking / provider override) or if Gemini fails.
@@ -354,8 +402,8 @@ export async function POST(request: NextRequest) {
     try {
       const upstream =
         p.name === "gemini"
-          ? await callGemini(normalized, temperature, controller.signal)
-          : await callOllama(p.model, normalized, temperature, controller.signal);
+          ? await callGemini(normalized, temperature, maxTokens, controller.signal)
+          : await callOllama(p.model, normalized, temperature, maxTokens, controller.signal);
 
       if (!upstream.ok || !upstream.body) {
         // Capture upstream error body for debugging

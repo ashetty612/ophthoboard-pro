@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { CasesDatabase, CaseData } from "@/lib/types";
-import CVBLogo from "./CVBLogo";
 import LensleyAvatar from "./brand/LensleyAvatar";
 import EyesaacAvatar from "./brand/EyesaacAvatar";
 import { fadeUp, stagger, easeOut } from "@/lib/motion";
+import { createFlashcard } from "@/lib/user-flashcards";
 
 /**
  * AI Examiner — powered by Gemini 3 Flash Preview (primary) via Google
@@ -16,7 +16,8 @@ import { fadeUp, stagger, easeOut } from "@/lib/motion";
  * Visual upgrade (framer-motion):
  *   - Mode selector: per-mode micro-icons, gradient border sweep on select,
  *     staggered entrance, spring-bounce on tap.
- *   - Chat bubbles: emerald gradient user bubbles, glass AI bubble w/ CVBLogo chip.
+ *   - Chat bubbles: persona-styled (Lensley=emerald, Eyesaac=steel) with
+ *     name+title header; animated avatar breathes while idle, pulses while speaking.
  *   - New messages: fadeUp + x-offset entrance.
  *   - Typing indicator: three staggered bouncing emerald dots.
  *   - Reasoning shimmer: letter-spaced title + "(taking longer…)" after 3s.
@@ -175,6 +176,7 @@ function caseOpeningMessage(c: CaseData): string {
 
 async function streamViaProxy(
   messages: Message[],
+  mode: ExaminerMode,
   onChunk: (text: string) => void,
   onProgress: (firstByteMs: number) => void,
   onError: (code: string, message: string) => void,
@@ -189,6 +191,7 @@ async function streamViaProxy(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        mode,
       }),
       signal,
     });
@@ -267,97 +270,375 @@ function friendlyError(code: string, msg: string): string {
 // Markdown
 // ---------------------------------------------------------------------------
 
-interface MdPart {
-  type: "text" | "link" | "bold" | "italic" | "image" | "heading" | "br";
-  content: string;
-  href?: string;
+/**
+ * Markdown renderer.
+ * Supports: headings (# ## ###), bold (**x**), italic (*x*, _x_), inline
+ * code (`x`), links, images, fenced code blocks (```), bullet lists
+ * (-/* /•), numbered lists (1.), blockquotes (> ) — used for PEARL
+ * callouts, simple pipe-tables, and bare paragraphs.
+ *
+ * Block-level elements are parsed line-by-line and then inline-parsed
+ * for the text content only. Kept intentionally small — we don't need
+ * a full CommonMark implementation, just the handful of block elements
+ * the model actually emits.
+ */
+
+type InlineSegment =
+  | { type: "text"; content: string }
+  | { type: "bold"; content: string }
+  | { type: "italic"; content: string }
+  | { type: "code"; content: string }
+  | { type: "link"; content: string; href: string }
+  | { type: "image"; content: string; href: string };
+
+interface MdBlock {
+  type:
+    | "heading"
+    | "paragraph"
+    | "bullet"
+    | "number"
+    | "blockquote"
+    | "code-block"
+    | "table"
+    | "image-block"
+    | "spacer";
   level?: number;
+  // heading / paragraph / blockquote / bullet / number / image-block content
+  inline?: InlineSegment[];
+  href?: string;
+  alt?: string;
+  // code-block
+  code?: string;
+  lang?: string;
+  // bullet/number list carry ordinal
+  listIndex?: number;
+  // table: each row is a list of inline-rendered cells
+  rows?: InlineSegment[][][];
 }
 
-function parseMarkdown(text: string): MdPart[] {
-  const out: MdPart[] = [];
-  const lines = text.split("\n");
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
-    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
-    if (headingMatch) {
-      out.push({ type: "heading", content: headingMatch[2], level: headingMatch[1].length });
-      if (li < lines.length - 1) out.push({ type: "br", content: "" });
-      continue;
+function parseInline(text: string): InlineSegment[] {
+  const out: InlineSegment[] = [];
+  let rem = text;
+  while (rem.length) {
+    type Hit = {
+      i: number;
+      full: string;
+      seg: InlineSegment;
+    };
+    const hits: Hit[] = [];
+    const imgM = rem.match(/!\[([^\]]*)\]\(([^)\s]+)\)/);
+    if (imgM?.index !== undefined)
+      hits.push({ i: imgM.index, full: imgM[0], seg: { type: "image", content: imgM[1], href: imgM[2] } });
+    const lnkM = rem.match(/\[([^\]]+)\]\(([^)\s]+)\)/);
+    if (lnkM?.index !== undefined)
+      hits.push({ i: lnkM.index, full: lnkM[0], seg: { type: "link", content: lnkM[1], href: lnkM[2] } });
+    const bM = rem.match(/\*\*([^*]+)\*\*/);
+    if (bM?.index !== undefined) hits.push({ i: bM.index, full: bM[0], seg: { type: "bold", content: bM[1] } });
+    const cM = rem.match(/`([^`]+)`/);
+    if (cM?.index !== undefined) hits.push({ i: cM.index, full: cM[0], seg: { type: "code", content: cM[1] } });
+    // Italic — _foo_ or *foo* but NOT **foo**
+    const iM = rem.match(/(^|[^*_\w])([*_])([^*_\n]+)\2(?=[^*_\w]|$)/);
+    if (iM?.index !== undefined) {
+      const innerStart = iM.index + (iM[1]?.length ?? 0);
+      hits.push({ i: innerStart, full: iM[2] + iM[3] + iM[2], seg: { type: "italic", content: iM[3] } });
     }
-    let rem = line;
-    while (rem.length > 0) {
-      const matches: Array<{ type: MdPart["type"]; index: number; full: string; c: string; href?: string }> = [];
-      const imgM = rem.match(/!\[([^\]]*)\]\(([^)]+)\)/);
-      if (imgM?.index !== undefined) matches.push({ type: "image", index: imgM.index, full: imgM[0], c: imgM[1], href: imgM[2] });
-      const lnkM = rem.match(/\[([^\]]+)\]\(([^)]+)\)/);
-      if (lnkM?.index !== undefined) matches.push({ type: "link", index: lnkM.index, full: lnkM[0], c: lnkM[1], href: lnkM[2] });
-      const bM = rem.match(/\*\*([^*]+)\*\*/);
-      if (bM?.index !== undefined) matches.push({ type: "bold", index: bM.index, full: bM[0], c: bM[1] });
-      const iM = rem.match(/(?:^|[^*_])[*_]([^*_]+)[*_](?:[^*_]|$)/);
-      if (iM?.index !== undefined) {
-        const inner = iM[1];
-        const leading = iM[0].indexOf(inner) - 1;
-        const absIdx = iM.index + leading;
-        matches.push({ type: "italic", index: absIdx, full: inner, c: inner });
-      }
-      matches.sort((a, b) => a.index - b.index);
-      if (!matches.length) { out.push({ type: "text", content: rem }); break; }
-      const m = matches[0]!;
-      if (m.index > 0) out.push({ type: "text", content: rem.slice(0, m.index) });
-      if (m.type === "image") out.push({ type: "image", content: m.c, href: m.href });
-      else if (m.type === "link") out.push({ type: "link", content: m.c, href: m.href });
-      else if (m.type === "bold") out.push({ type: "bold", content: m.c });
-      else if (m.type === "italic") out.push({ type: "italic", content: m.c });
-      rem = rem.slice(m.index + m.full.length);
+    hits.sort((a, b) => a.i - b.i);
+    if (!hits.length) {
+      out.push({ type: "text", content: rem });
+      break;
     }
-    if (li < lines.length - 1) out.push({ type: "br", content: "" });
+    const first = hits[0]!;
+    if (first.i > 0) out.push({ type: "text", content: rem.slice(0, first.i) });
+    out.push(first.seg);
+    rem = rem.slice(first.i + first.full.length);
   }
   return out;
 }
 
+function parseMarkdownBlocks(text: string): MdBlock[] {
+  const blocks: MdBlock[] = [];
+  const lines = text.split("\n");
+  let i = 0;
+
+  const flushParagraph = (buf: string[]) => {
+    if (!buf.length) return;
+    const joined = buf.join(" ").trim();
+    if (joined) blocks.push({ type: "paragraph", inline: parseInline(joined) });
+    buf.length = 0;
+  };
+
+  const paragraphBuf: string[] = [];
+  while (i < lines.length) {
+    const line = lines[i];
+    const raw = line.trimEnd();
+    const trimmed = raw.trim();
+
+    // Blank line — end of current block
+    if (!trimmed) {
+      flushParagraph(paragraphBuf);
+      blocks.push({ type: "spacer" });
+      i++;
+      continue;
+    }
+
+    // Heading
+    const h = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (h) {
+      flushParagraph(paragraphBuf);
+      blocks.push({ type: "heading", level: h[1].length, inline: parseInline(h[2]) });
+      i++;
+      continue;
+    }
+
+    // Fenced code block
+    if (trimmed.startsWith("```")) {
+      flushParagraph(paragraphBuf);
+      const lang = trimmed.slice(3).trim() || undefined;
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: "code-block", code: codeLines.join("\n"), lang });
+      if (i < lines.length) i++; // skip closing fence
+      continue;
+    }
+
+    // Blockquote (used for PEARLS callouts)
+    if (trimmed.startsWith("> ")) {
+      flushParagraph(paragraphBuf);
+      const quoteLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith("> ")) {
+        quoteLines.push(lines[i].trim().slice(2));
+        i++;
+      }
+      blocks.push({ type: "blockquote", inline: parseInline(quoteLines.join(" ")) });
+      continue;
+    }
+
+    // Bullet list
+    const bullet = trimmed.match(/^[-*•]\s+(.+)$/);
+    if (bullet) {
+      flushParagraph(paragraphBuf);
+      let idx = 0;
+      while (i < lines.length) {
+        const m = lines[i].trim().match(/^[-*•]\s+(.+)$/);
+        if (!m) break;
+        blocks.push({ type: "bullet", listIndex: idx++, inline: parseInline(m[1]) });
+        i++;
+      }
+      continue;
+    }
+
+    // Numbered list
+    const num = trimmed.match(/^(\d+)\.\s+(.+)$/);
+    if (num) {
+      flushParagraph(paragraphBuf);
+      while (i < lines.length) {
+        const m = lines[i].trim().match(/^(\d+)\.\s+(.+)$/);
+        if (!m) break;
+        blocks.push({ type: "number", listIndex: parseInt(m[1], 10), inline: parseInline(m[2]) });
+        i++;
+      }
+      continue;
+    }
+
+    // Simple pipe table: | col | col |   then |---|---|   then rows
+    if (/^\|.*\|/.test(trimmed) && i + 1 < lines.length && /^\|[\s\-:|]+\|$/.test(lines[i + 1].trim())) {
+      flushParagraph(paragraphBuf);
+      const rows: InlineSegment[][][] = [];
+      // Header
+      const headCells = trimmed.replace(/^\||\|$/g, "").split("|").map((c) => parseInline(c.trim()));
+      rows.push(headCells);
+      i += 2; // skip divider
+      while (i < lines.length && /^\|.*\|/.test(lines[i].trim())) {
+        const row = lines[i].trim().replace(/^\||\|$/g, "").split("|").map((c) => parseInline(c.trim()));
+        rows.push(row);
+        i++;
+      }
+      blocks.push({ type: "table", rows });
+      continue;
+    }
+
+    // Standalone image line
+    const imgOnly = trimmed.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+    if (imgOnly) {
+      flushParagraph(paragraphBuf);
+      blocks.push({ type: "image-block", alt: imgOnly[1], href: imgOnly[2] });
+      i++;
+      continue;
+    }
+
+    // Otherwise, accumulate into paragraph
+    paragraphBuf.push(raw);
+    i++;
+  }
+  flushParagraph(paragraphBuf);
+  return blocks;
+}
+
+function renderInline(segs: InlineSegment[], keyPrefix: string) {
+  return segs.map((s, i) => {
+    const k = `${keyPrefix}-${i}`;
+    switch (s.type) {
+      case "bold":
+        return <strong key={k} className="font-semibold text-white">{s.content}</strong>;
+      case "italic":
+        return <em key={k} className="text-slate-300 italic">{s.content}</em>;
+      case "code":
+        return (
+          <code key={k} className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[0.85em] font-mono text-primary-200">
+            {s.content}
+          </code>
+        );
+      case "link":
+        return (
+          <a key={k} href={s.href} target="_blank" rel="noopener noreferrer"
+             className="text-primary-400 hover:text-primary-300 underline font-medium">
+            {s.content}
+          </a>
+        );
+      case "image":
+        return (
+          <motion.img
+            key={k}
+            src={s.href}
+            alt={s.content || "Clinical image"}
+            className="my-2 inline-block max-h-80 w-auto rounded-lg border border-slate-700/50"
+            loading="lazy"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.45, ease: easeOut }}
+          />
+        );
+      default:
+        return <span key={k}>{s.content}</span>;
+    }
+  });
+}
+
 function renderMarkdown(text: string) {
-  const parts = parseMarkdown(text);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.type === "image") {
-          return (
-            <motion.img
-              key={i}
-              src={part.href}
-              alt={part.content || "Clinical image"}
-              className="my-2 max-h-96 w-auto rounded-xl border border-slate-700/50 block"
-              loading="lazy"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, ease: easeOut }}
-            />
-          );
+  const blocks = parseMarkdownBlocks(text);
+  const out: React.ReactNode[] = [];
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const b = blocks[bi];
+    const k = `b-${bi}`;
+    switch (b.type) {
+      case "heading": {
+        const size = b.level === 1 ? "text-lg" : b.level === 2 ? "text-base" : "text-sm";
+        out.push(
+          <h3 key={k} className={`mt-3 mb-1.5 font-bold text-white ${size}`}>
+            {renderInline(b.inline || [], k)}
+          </h3>
+        );
+        break;
+      }
+      case "paragraph":
+        out.push(
+          <p key={k} className="my-1.5 leading-relaxed">
+            {renderInline(b.inline || [], k)}
+          </p>
+        );
+        break;
+      case "bullet":
+        // Group consecutive bullets visually — render each as its own row
+        out.push(
+          <div key={k} className="flex gap-2 pl-2 my-0.5">
+            <span aria-hidden className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" />
+            <div className="leading-relaxed">{renderInline(b.inline || [], k)}</div>
+          </div>
+        );
+        break;
+      case "number":
+        out.push(
+          <div key={k} className="flex gap-2 pl-1 my-0.5">
+            <span className="shrink-0 font-mono text-primary-300 tabular-nums">
+              {(b.listIndex ?? 1).toString().padStart(2, " ")}.
+            </span>
+            <div className="leading-relaxed">{renderInline(b.inline || [], k)}</div>
+          </div>
+        );
+        break;
+      case "blockquote":
+        out.push(
+          <blockquote
+            key={k}
+            className="my-2 rounded-lg border-l-2 border-primary-400/70 bg-primary-500/10 px-3 py-2 text-primary-100"
+          >
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 text-primary-400" aria-hidden>◆</span>
+              <div className="leading-relaxed">{renderInline(b.inline || [], k)}</div>
+            </div>
+          </blockquote>
+        );
+        break;
+      case "code-block":
+        out.push(
+          <pre key={k} className="my-2 overflow-x-auto rounded-lg border border-slate-700/50 bg-slate-950/70 p-3 text-xs leading-relaxed">
+            {b.lang && (
+              <div className="mb-1 text-[10px] uppercase tracking-wider text-slate-500">{b.lang}</div>
+            )}
+            <code className="font-mono text-slate-200">{b.code}</code>
+          </pre>
+        );
+        break;
+      case "image-block":
+        out.push(
+          <motion.img
+            key={k}
+            src={b.href}
+            alt={b.alt || "Clinical image"}
+            className="my-2 block max-h-96 w-auto rounded-xl border border-slate-700/50"
+            loading="lazy"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: easeOut }}
+          />
+        );
+        break;
+      case "table":
+        out.push(
+          <div key={k} className="my-2 overflow-x-auto rounded-lg border border-slate-700/50">
+            <table className="min-w-full text-xs">
+              <thead className="bg-slate-800/60 text-slate-300">
+                <tr>
+                  {(b.rows?.[0] || []).map((cell, ci) => (
+                    <th key={ci} className="border-b border-slate-700/40 px-3 py-1.5 text-left font-semibold">
+                      {renderInline(cell, `${k}-h-${ci}`)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="text-slate-200">
+                {(b.rows?.slice(1) || []).map((row, ri) => (
+                  <tr key={ri} className="odd:bg-slate-900/30">
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="border-b border-slate-800/50 px-3 py-1.5 align-top">
+                        {renderInline(cell, `${k}-r-${ri}-${ci}`)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        break;
+      case "spacer":
+        // Only render a visible gap between two non-list blocks to avoid
+        // double-spacing inside lists.
+        if (bi > 0 && bi < blocks.length - 1) {
+          const prev = blocks[bi - 1].type;
+          const next = blocks[bi + 1].type;
+          if (prev !== "bullet" && prev !== "number" && next !== "bullet" && next !== "number") {
+            out.push(<div key={k} className="h-1.5" />);
+          }
         }
-        if (part.type === "link") {
-          return (
-            <a key={i} href={part.href} target="_blank" rel="noopener noreferrer"
-               className="text-primary-400 hover:text-primary-300 underline font-medium">
-              {part.content}
-            </a>
-          );
-        }
-        if (part.type === "bold") {
-          return <strong key={i} className="font-semibold text-white">{part.content}</strong>;
-        }
-        if (part.type === "italic") {
-          return <em key={i} className="text-slate-300 italic">{part.content}</em>;
-        }
-        if (part.type === "heading") {
-          const size = part.level === 1 ? "text-lg" : part.level === 2 ? "text-base" : "text-sm";
-          return <strong key={i} className={`block ${size} font-bold text-white mt-2 mb-1`}>{part.content}</strong>;
-        }
-        if (part.type === "br") return <br key={i} />;
-        return <span key={i}>{part.content}</span>;
-      })}
-    </>
-  );
+        break;
+    }
+  }
+  return <>{out}</>;
 }
 
 // ---------------------------------------------------------------------------
@@ -573,6 +854,129 @@ const MODE_CARDS: Array<[ExaminerMode, string, string, string]> = [
   ["free-chat", "Free Chat", "Open discussion.", "from-primary-500 to-violet-500"],
 ];
 
+// ---------------------------------------------------------------------------
+// Persona + quick-action maps
+// ---------------------------------------------------------------------------
+//
+// Which mascot speaks in which mode matters: Lensley runs examiner-style
+// modes with authority; Eyesaac hosts teaching modes with warmth. Each
+// gets their own accent color and ring so the user can feel the switch.
+
+type PersonaKey = "lensley" | "eyesaac";
+
+interface Persona {
+  key: PersonaKey;
+  name: string;
+  title: string;
+  ringClass: string;
+  accentClass: string;
+  shadowColor: string; // rgba for the speech-bubble glow
+  bubbleBorder: string;
+  Avatar: typeof LensleyAvatar;
+}
+
+const LENSLEY: Persona = {
+  key: "lensley",
+  name: "Lensley",
+  title: "Chief Examiner",
+  ringClass: "ring-primary-500/40",
+  accentClass: "text-primary-300",
+  shadowColor: "rgba(4,121,98,0.35)",
+  bubbleBorder: "border-primary-500/20",
+  Avatar: LensleyAvatar,
+};
+
+const EYESAAC: Persona = {
+  key: "eyesaac",
+  name: "Eyesaac",
+  title: "Co-Resident",
+  ringClass: "ring-steel-500/40",
+  accentClass: "text-steel-300",
+  shadowColor: "rgba(52,120,150,0.30)",
+  bubbleBorder: "border-steel-500/20",
+  Avatar: EyesaacAvatar,
+};
+
+/** Which mascot narrates a given mode. */
+function personaForMode(mode: ExaminerMode): Persona {
+  return ["examiner", "viva", "quiz", "ddx-drill"].includes(mode) ? LENSLEY : EYESAAC;
+}
+
+/** Quick-reply chips shown under the latest AI message. Mode-aware: the
+ *  chips map to common follow-ups so the candidate can stay in the flow
+ *  without having to type. Taken from real oral-boards mechanics. */
+function quickActionsFor(mode: ExaminerMode): Array<{ label: string; prompt: string }> {
+  const common = [
+    { label: "Give me a hint", prompt: "Give me a single focused hint without revealing the answer." },
+    { label: "Pearl for this", prompt: "What is the one highest-yield pearl for this topic?" },
+  ];
+  switch (mode) {
+    case "examiner":
+      return [
+        { label: "Take a history", prompt: "Here is the history I'd take: (1) onset + duration, (2) laterality, (3) pain/vision change, (4) systemic — HTN, DM, auto-immune, (5) meds and allergies, (6) prior ocular surgery. Probe where needed." },
+        { label: "Describe the image", prompt: "I'll describe the image now." },
+        { label: "Differential (top 3)", prompt: "My top 3 differential, most likely first with reasoning." },
+        { label: "Workup", prompt: "The targeted workup I would order, with the reason for each test." },
+        { label: "Management plan", prompt: "My management plan, organized by first-line, second-line, and surgical tiers with specific drugs / doses." },
+        { label: "Follow-up", prompt: "My follow-up plan: interval, what I check each visit, and what would make me escalate." },
+        { label: "I'd like the curveball", prompt: "Hit me with your curveball now." },
+        { label: "Score me", prompt: "Score me now across the 3 domains (Data-Acq / Dx / Mgmt, 0–3 each) and name any fatal flaw I missed." },
+      ];
+    case "viva":
+      return [
+        { label: "Commit — 3 sentences", prompt: "I'll commit to a 3-sentence answer now." },
+        { label: "Go deeper", prompt: "Ask me a harder follow-up on the same topic." },
+        { label: "New topic", prompt: "Move to a new topic." },
+        { label: "Score me", prompt: "Give me my domain scores now." },
+      ];
+    case "quiz":
+      return [
+        { label: "Next question", prompt: "Next question." },
+        { label: "Tougher please", prompt: "Tougher question please." },
+        { label: "Change subspecialty", prompt: "Switch subspecialty for the next question." },
+        { label: "Score me", prompt: "Give me the Data-Acq / Dx / Mgmt tallies so far." },
+      ];
+    case "ddx-drill":
+      return [
+        { label: "Reveal gold standard", prompt: "Reveal the gold-standard 5 DDx with reasoning." },
+        { label: "Next drill", prompt: "Next DDx drill — different subspecialty." },
+        { label: "Can't-miss only", prompt: "Give me only the can't-miss items for this presentation." },
+      ];
+    case "soap":
+      return [
+        { label: "Show ideal SOAP", prompt: "Show the ideal SOAP for the scenario." },
+        { label: "New scenario", prompt: "Present a new SOAP-practice scenario." },
+      ];
+    case "case-builder":
+      return [
+        { label: "Another case", prompt: "Build another case — different subspecialty." },
+        { label: "Make it harder", prompt: "Build a harder case with a fatal-flaw trap." },
+        { label: "Add an image", prompt: "Rebuild the case and include a described imaging finding (OCT / FA / CT / MRI as appropriate)." },
+      ];
+    case "deep-dive":
+      return [
+        { label: "More trials", prompt: "Give me the landmark trials with their numeric results." },
+        { label: "More pearls", prompt: "Ten more board pearls on this topic." },
+        { label: "Fatal flaws here", prompt: "What fatal flaws are tested most on this topic, with the safety-net phrase for each?" },
+        { label: "Pop quiz me", prompt: "Pop quiz me with 3 rapid questions on this topic." },
+      ];
+    case "pearls":
+      return [
+        { label: "10 more", prompt: "Ten more pearls on the same topic." },
+        { label: "Mnemonics", prompt: "Mnemonics for this topic." },
+        { label: "New topic", prompt: "Pearl dump for a different high-yield topic." },
+      ];
+    case "tutor":
+      return [
+        ...common,
+        { label: "Quiz me", prompt: "Quiz me on what you just taught (5 questions)." },
+        { label: "Simpler", prompt: "Explain the same thing but simpler." },
+      ];
+    default:
+      return common;
+  }
+}
+
 const AUTO_START_PROMPT: Record<ExaminerMode, string> = {
   examiner: "Start the case. I'll walk through my approach.",
   viva: "First question.",
@@ -589,6 +993,33 @@ const AUTO_START_PROMPT: Record<ExaminerMode, string> = {
 // ---------------------------------------------------------------------------
 // Sub-components (hooks kept at top of each)
 // ---------------------------------------------------------------------------
+
+/** Tiny action chip used on AI messages for Copy / Save-as-flashcard /
+ *  Regenerate. Muted by default; flashes emerald on success. */
+function ActionChip({
+  onClick,
+  icon,
+  label,
+  tone = "neutral",
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  tone?: "neutral" | "success";
+}) {
+  const base =
+    "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors";
+  const toneClasses =
+    tone === "success"
+      ? "bg-primary-500/15 text-primary-200 border border-primary-500/40"
+      : "bg-slate-800/50 text-slate-400 border border-slate-700/40 hover:bg-slate-700/50 hover:text-slate-200";
+  return (
+    <button onClick={onClick} className={`${base} ${toneClasses}`} aria-label={label}>
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
 
 function TypingIndicator() {
   const reduce = useReducedMotion();
@@ -659,11 +1090,22 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
   const [currentCase, setCurrentCase] = useState<CaseData | null>(initialCase || null);
   const [subspecialtyFocus, setSubspecialtyFocus] = useState<string>("");
   const [error, setError] = useState<string>("");
+  // Copy/save feedback — keyed by the message index they act on
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [savedIdx, setSavedIdx] = useState<number | null>(null);
+  // Session timer — counts DOWN for timed modes, UP otherwise
+  const [sessionMs, setSessionMs] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reduce = useReducedMotion();
+
+  const persona = personaForMode(mode);
+  // Modes with a target ABO pace get a 3:30 countdown. Others just count up.
+  const isTimedMode = mode === "examiner" || mode === "viva";
+  const SESSION_TARGET_MS = 3.5 * 60_000;
 
   const casesWithImages = useMemo(
     () =>
@@ -681,7 +1123,40 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     if (started && inputRef.current) inputRef.current.focus();
   }, [started, isStreaming]);
 
-  useEffect(() => () => { abortRef.current?.abort(); if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current); }, []);
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+    if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
+  }, []);
+
+  // Session-level timer (starts when the session starts, stops when unmounted
+  // or when user returns to mode-select via the "Modes" button).
+  useEffect(() => {
+    if (!started) {
+      if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
+      setSessionMs(0);
+      return;
+    }
+    const t0 = performance.now();
+    setSessionMs(0);
+    sessionTimerRef.current = setInterval(() => {
+      setSessionMs(Math.round(performance.now() - t0));
+    }, 1000);
+    return () => {
+      if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
+    };
+  }, [started]);
+
+  // Global Esc — stop streaming when mid-response
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isStreaming) {
+        abortRef.current?.abort();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isStreaming]);
 
   const startElapsed = () => {
     const t0 = performance.now();
@@ -715,6 +1190,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
       let gotError = false;
       await streamViaProxy(
         updatedMessages,
+        mode,
         (chunk) => {
           accumulated += chunk;
           setMessages([...updatedMessages, { role: "assistant", content: accumulated }]);
@@ -734,7 +1210,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
       setIsStreaming(false);
       stopElapsed();
     },
-    []
+    [mode]
   );
 
   const startSession = useCallback(() => {
@@ -808,6 +1284,71 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     await streamAndAppend(prior);
   };
 
+  /** Send a prompt directly — used by quick-action chips so the user
+   *  doesn't have to type the full phrase. */
+  const sendQuickAction = async (prompt: string) => {
+    if (isStreaming) return;
+    const userMsg: Message = { role: "user", content: prompt };
+    const updated = [...messages, userMsg];
+    setMessages(updated);
+    await streamAndAppend(updated);
+  };
+
+  /** Copy a message to clipboard. Brief visual confirmation via copiedIdx. */
+  const copyMessage = async (content: string, visibleIdx: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIdx(visibleIdx);
+      setTimeout(() => setCopiedIdx((cur) => (cur === visibleIdx ? null : cur)), 1500);
+    } catch {
+      // Clipboard blocked (iframe / insecure context). Fall back to a textarea trick.
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = content;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setCopiedIdx(visibleIdx);
+        setTimeout(() => setCopiedIdx((cur) => (cur === visibleIdx ? null : cur)), 1500);
+      } catch {
+        /* give up silently */
+      }
+    }
+  };
+
+  /** Turn an AI message into a user flashcard (front = preceding user
+   *  prompt / auto-derived, back = full AI content). Tags with the mode
+   *  and subspecialty so they're easy to filter in the flashcard browser. */
+  const saveAsFlashcard = (visibleIdx: number, aiContent: string) => {
+    const vis = messages.filter((m) => m.role !== "system");
+    const prior = vis.slice(0, visibleIdx).reverse().find((m) => m.role === "user");
+    // Sensible front: the user turn that prompted this AI message, or the
+    // first line of the AI content if there was no preceding user turn.
+    const front = (prior?.content?.trim() || aiContent.split("\n").find((l) => l.trim())?.slice(0, 160) || "Pearl").slice(0, 240);
+    const tags = [mode, subspecialtyFocus, currentCase?.subspecialty, "ai-pearl"].filter(Boolean) as string[];
+    try {
+      createFlashcard({
+        front,
+        back: aiContent.slice(0, 4000),
+        tags,
+      });
+      setSavedIdx(visibleIdx);
+      setTimeout(() => setSavedIdx((cur) => (cur === visibleIdx ? null : cur)), 1600);
+    } catch {
+      /* storage full or unavailable — silent fail */
+    }
+  };
+
+  const formatTimer = (ms: number) => {
+    const totalS = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(totalS / 60);
+    const s = totalS % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
   // ─── MODE SELECTION ──────────────────────────────────────────────────
   if (!started) {
     return (
@@ -837,28 +1378,31 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
         >
           <div className="glass-card rounded-2xl p-6 sm:p-8">
             <div className="text-center mb-6">
-              {/* Mascot duo — Lensley (attending) examines on the left, Eyesaac
-                  (student) celebrates on the right. Subtle labels so users
-                  learn the cast. */}
+              {/* Mascot duo — Lensley (Chief Examiner) runs exam-style modes
+                  on the left; Eyesaac (Co-Resident) hosts teaching modes on
+                  the right. Role labels match the in-product behavior. */}
               <div className="mx-auto mb-4 flex items-end justify-center gap-3">
                 <div className="flex flex-col items-center">
                   <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-slate-800 to-slate-900 ring-1 ring-primary-500/30">
                     <LensleyAvatar size={56} />
                   </div>
                   <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.15em] text-primary-300">Lensley</span>
+                  <span className="text-[9px] text-slate-500">Chief Examiner</span>
                 </div>
-                <div className="text-slate-600 text-lg mb-3" aria-hidden>✦</div>
+                <div className="text-slate-600 text-lg mb-6" aria-hidden>✦</div>
                 <div className="flex flex-col items-center">
                   <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-slate-800 to-slate-900 ring-1 ring-steel-500/30">
                     <EyesaacAvatar size={56} />
                   </div>
                   <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.15em] text-steel-300">Eyesaac</span>
+                  <span className="text-[9px] text-slate-500">Co-Resident</span>
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-white mb-1">AI Examiner & Tutor</h2>
               <p className="text-sm text-slate-400">
-                Lensley grills you like a real ABO examiner. Eyesaac walks you through every
-                teaching mode. Grounded in 27 fatal flaws, 46 trials, 25 AAO PPPs.
+                Lensley grills you like a real ABO examiner; Eyesaac walks you through every
+                teaching mode like the senior resident you wish you had. Grounded in 27 fatal
+                flaws, 46 trials, 25 AAO PPPs.
               </p>
             </div>
 
@@ -1008,85 +1552,219 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
             </svg>
             <span className="text-sm">Exit</span>
           </button>
-          <div className="text-center min-w-0">
-            <p className="text-sm font-medium text-white truncate">
+          <div className="flex min-w-0 flex-col items-center">
+            <p className="text-sm font-medium text-white truncate flex items-center gap-1.5">
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${persona.key === "lensley" ? "bg-primary-400" : "bg-steel-400"}`} aria-hidden />
               {MODE_CARDS.find(([k]) => k === mode)?.[1] || mode}
             </p>
-            {currentCase && <p className="text-xs text-slate-400 truncate">{currentCase.title}</p>}
+            <p className="text-[10px] text-slate-500 truncate">
+              With {persona.name} — {persona.title}
+              {currentCase && <> · {currentCase.title}</>}
+            </p>
           </div>
-          <button
-            onClick={() => {
-              abortRef.current?.abort();
-              setMessages([]);
-              setStarted(false);
-              setError("");
-            }}
-            className="text-xs text-slate-400 hover:text-white transition-colors px-3 py-2 rounded-lg min-h-[44px]"
-            aria-label="Change mode"
-          >
-            Modes
-          </button>
+          <div className="flex items-center gap-2">
+            {started && (
+              <div
+                className={`hidden sm:flex flex-col items-end font-mono tabular-nums text-[10px] leading-tight ${
+                  isTimedMode && sessionMs > SESSION_TARGET_MS ? "text-rose-300" : "text-slate-400"
+                }`}
+                title={isTimedMode ? "ABO target pace: 3:30 per case" : "Session time"}
+              >
+                <span className="text-xs">
+                  {isTimedMode
+                    ? formatTimer(Math.max(0, SESSION_TARGET_MS - sessionMs))
+                    : formatTimer(sessionMs)}
+                </span>
+                <span className="text-[9px] uppercase tracking-wide text-slate-500">
+                  {isTimedMode ? (sessionMs > SESSION_TARGET_MS ? "over pace" : "time left") : "elapsed"}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                abortRef.current?.abort();
+                setMessages([]);
+                setStarted(false);
+                setError("");
+              }}
+              className="text-xs text-slate-400 hover:text-white transition-colors px-3 py-2 rounded-lg min-h-[44px]"
+              aria-label="Change mode"
+            >
+              Modes
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+        <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
           {visibleMessages.map((msg, i) => {
             const isUser = msg.role === "user";
-            const isPlaceholder = !isUser && !msg.content && isStreaming && i === visibleMessages.length - 1;
+            const isLastAi = !isUser && i === visibleMessages.length - 1;
+            const isPlaceholder = isLastAi && !msg.content && isStreaming;
+            const PersonaAvatar = persona.Avatar;
+
             return (
               <motion.div
                 key={i}
                 initial={reduce ? false : { opacity: 0, y: 8, x: isUser ? 8 : -8 }}
                 animate={{ opacity: 1, y: 0, x: 0 }}
                 transition={{ duration: 0.4, ease: easeOut }}
-                className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}
+                className={`flex items-start gap-2.5 ${isUser ? "justify-end" : "justify-start"}`}
               >
                 {!isUser && (
-                  <div className="shrink-0 mb-1 hidden sm:block">
-                    {/* Lensley narrates examiner-style modes (mock exam, viva, quiz, ddx-drill);
-                        Eyesaac hosts teaching/case-builder/pearls/tutor. Matches mascot personas. */}
-                    <div className="h-10 w-10 overflow-hidden rounded-full ring-1 ring-primary-500/35 bg-gradient-to-br from-slate-800 to-slate-900 shadow-[0_6px_20px_-6px_rgba(4,121,98,0.45)]">
-                      {(["examiner", "viva", "quiz", "ddx-drill"].includes(mode)) ? (
-                        <LensleyAvatar size={40} />
-                      ) : (
-                        <EyesaacAvatar size={40} />
+                  <div className="shrink-0 mt-6 hidden sm:block">
+                    <motion.div
+                      className={`relative h-10 w-10 overflow-hidden rounded-full ring-1 ${persona.ringClass} bg-gradient-to-br from-slate-800 to-slate-900`}
+                      style={{ boxShadow: `0 6px 20px -6px ${persona.shadowColor}` }}
+                      animate={
+                        reduce
+                          ? undefined
+                          : isLastAi && isStreaming
+                            ? { scale: [1, 1.04, 1] }
+                            : { scale: [1, 1.01, 1] }
+                      }
+                      transition={{
+                        duration: isLastAi && isStreaming ? 1.2 : 4,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      <PersonaAvatar size={40} />
+                      {isLastAi && isStreaming && !reduce && (
+                        <motion.span
+                          aria-hidden
+                          className={`pointer-events-none absolute inset-0 rounded-full ring-2 ${
+                            persona.key === "lensley" ? "ring-primary-400/70" : "ring-steel-400/70"
+                          }`}
+                          animate={{ opacity: [0.3, 0.9, 0.3], scale: [1, 1.12, 1] }}
+                          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                        />
                       )}
-                    </div>
+                    </motion.div>
                   </div>
                 )}
-                <div
-                  className={`max-w-[88%] rounded-2xl px-4 py-3 ${
-                    isUser
-                      ? "bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-[0_4px_20px_-6px_rgba(4,121,98,0.5)]"
-                      : "bg-slate-900/60 backdrop-blur border border-slate-700/40 text-slate-100"
-                  }`}
-                  style={
-                    isUser
-                      ? {
-                          backgroundImage:
-                            "linear-gradient(135deg, #047962 0%, #065f50 60%, #064e3b 100%), radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06) 0%, transparent 50%)",
-                          backgroundBlendMode: "overlay",
-                        }
-                      : undefined
-                  }
-                >
-                  {isPlaceholder ? (
-                    <TypingIndicator />
-                  ) : (
-                    <div className="text-sm whitespace-pre-wrap leading-relaxed chat-markdown">
-                      {renderMarkdown(msg.content)}
+                <div className={`flex min-w-0 max-w-[88%] flex-col ${isUser ? "items-end" : "items-start"}`}>
+                  {!isUser && (
+                    <div className="mb-1 flex items-baseline gap-2 pl-1">
+                      <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${persona.accentClass}`}>
+                        {persona.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500">{persona.title}</span>
                     </div>
                   )}
-                  {!isPlaceholder && !isUser && isStreaming && i === visibleMessages.length - 1 && firstByteMs != null && (
-                    <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500">
-                      <motion.span
-                        className="inline-block w-1 h-1 rounded-full bg-primary-400"
-                        animate={reduce ? undefined : { opacity: [0.3, 1, 0.3] }}
-                        transition={{ duration: 1, repeat: Infinity }}
+                  <div
+                    className={`rounded-2xl px-4 py-3 ${
+                      isUser
+                        ? "bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-[0_4px_20px_-6px_rgba(4,121,98,0.5)]"
+                        : `bg-slate-900/60 backdrop-blur border ${persona.bubbleBorder} text-slate-100`
+                    }`}
+                    style={
+                      isUser
+                        ? {
+                            backgroundImage:
+                              "linear-gradient(135deg, #047962 0%, #065f50 60%, #064e3b 100%), radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06) 0%, transparent 50%)",
+                            backgroundBlendMode: "overlay",
+                          }
+                        : undefined
+                    }
+                  >
+                    {isPlaceholder ? (
+                      <TypingIndicator />
+                    ) : (
+                      <div className="text-sm leading-relaxed chat-markdown">
+                        {renderMarkdown(msg.content)}
+                      </div>
+                    )}
+                    {!isPlaceholder && isLastAi && isStreaming && firstByteMs != null && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500">
+                        <motion.span
+                          className={`inline-block h-1 w-1 rounded-full ${persona.key === "lensley" ? "bg-primary-400" : "bg-steel-400"}`}
+                          animate={reduce ? undefined : { opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 1, repeat: Infinity }}
+                        />
+                        streaming · {((elapsedMs - firstByteMs) / 1000).toFixed(1)}s
+                        <span className="text-slate-600">·</span>
+                        <span className="text-slate-600">Esc to stop</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action row — copy / save as flashcard / regenerate */}
+                  {!isUser && !isPlaceholder && msg.content.length > 40 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5 pl-1">
+                      <ActionChip
+                        onClick={() => copyMessage(msg.content, i)}
+                        icon={
+                          copiedIdx === i ? (
+                            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+                              <path d="M3 8l3.5 3.5L13 5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden>
+                              <rect x="4" y="4" width="9" height="9" rx="1.5" />
+                              <path d="M3 11V3.5A0.5 0.5 0 013.5 3H11" />
+                            </svg>
+                          )
+                        }
+                        label={copiedIdx === i ? "Copied" : "Copy"}
+                        tone={copiedIdx === i ? "success" : "neutral"}
                       />
-                      streaming · {((elapsedMs - firstByteMs) / 1000).toFixed(1)}s
+                      <ActionChip
+                        onClick={() => saveAsFlashcard(i, msg.content)}
+                        icon={
+                          savedIdx === i ? (
+                            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+                              <path d="M3 8l3.5 3.5L13 5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden>
+                              <path d="M4 2h6l2 2v10l-5-2-5 2V2z" strokeLinejoin="round" />
+                            </svg>
+                          )
+                        }
+                        label={savedIdx === i ? "Saved" : "Save as flashcard"}
+                        tone={savedIdx === i ? "success" : "neutral"}
+                      />
+                      {isLastAi && !isStreaming && (
+                        <ActionChip
+                          onClick={regenerateLast}
+                          icon={
+                            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={1.7} aria-hidden>
+                              <path d="M13 8a5 5 0 11-1.5-3.5M13 2.5v3h-3" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          }
+                          label="Regenerate"
+                          tone="neutral"
+                        />
+                      )}
                     </div>
+                  )}
+
+                  {/* Quick-action chips below the LAST AI message only.
+                      Keeps the UI uncluttered and the chips contextual. */}
+                  {isLastAi && !isStreaming && msg.content.length > 40 && (
+                    <motion.div
+                      initial={reduce ? false : { opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.15 }}
+                      className="mt-2 flex flex-wrap gap-1.5 pl-1"
+                    >
+                      {quickActionsFor(mode).map((qa) => (
+                        <button
+                          key={qa.label}
+                          onClick={() => void sendQuickAction(qa.prompt)}
+                          className={`group inline-flex items-center gap-1 rounded-full border ${
+                            persona.key === "lensley"
+                              ? "border-primary-500/30 bg-primary-500/8 text-primary-200 hover:bg-primary-500/15 hover:border-primary-400/50"
+                              : "border-steel-500/30 bg-steel-500/8 text-steel-200 hover:bg-steel-500/15 hover:border-steel-400/50"
+                          } px-2.5 py-1 text-[11px] transition-colors`}
+                        >
+                          <span aria-hidden className="text-[10px] opacity-60 group-hover:opacity-100">↳</span>
+                          {qa.label}
+                        </button>
+                      ))}
+                    </motion.div>
                   )}
                 </div>
               </motion.div>
@@ -1100,13 +1778,22 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
             >
               <div className="max-w-[92%] rounded-2xl px-4 py-3 bg-rose-500/10 border border-rose-500/40 text-rose-200 text-sm">
                 {error}
-                <button
-                  onClick={regenerateLast}
-                  disabled={isStreaming}
-                  className="mt-2 text-xs underline hover:text-rose-100 block"
-                >
-                  Retry
-                </button>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  <button
+                    onClick={regenerateLast}
+                    disabled={isStreaming}
+                    className="text-xs underline hover:text-rose-100 disabled:opacity-50"
+                  >
+                    Retry
+                  </button>
+                  <button
+                    onClick={() => void sendQuickAction("Please try again — keep it shorter and more concise.")}
+                    disabled={isStreaming}
+                    className="text-xs underline hover:text-rose-100 disabled:opacity-50"
+                  >
+                    Retry (ask for shorter)
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1117,28 +1804,51 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
       <div className="glass-card border-t border-slate-700/50">
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex gap-2 items-end">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void sendMessage();
+            <div className="flex-1 relative">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value.slice(0, 2000))}
+                onKeyDown={(e) => {
+                  // Enter to send, Shift+Enter for newline, Cmd/Ctrl+Enter
+                  // also sends (nice for users with "Enter=newline" muscle memory)
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void sendMessage();
+                  } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+                placeholder={
+                  isStreaming
+                    ? `${persona.name} is responding — press Esc or Stop to interrupt`
+                    : `Answer ${persona.name} or ask anything… (Enter to send · Shift+Enter = newline)`
                 }
-              }}
-              placeholder={isStreaming ? "AI is responding — press Stop to interrupt" : "Answer or ask anything… (Enter to send, Shift+Enter newline)"}
-              disabled={isStreaming}
-              rows={1}
-              className="flex-1 resize-none px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-700/50 text-white text-sm placeholder-slate-500 focus:border-primary-500/50 min-h-[44px] max-h-40"
-              aria-label="Your message"
-            />
+                disabled={isStreaming}
+                rows={1}
+                maxLength={2000}
+                className="w-full resize-none px-4 py-3 pr-16 rounded-xl bg-slate-900/60 border border-slate-700/50 text-white text-sm placeholder-slate-500 focus:border-primary-500/50 focus:ring-4 focus:ring-primary-500/10 min-h-[44px] max-h-40 transition-colors"
+                aria-label="Your message"
+              />
+              {input.length > 1500 && (
+                <span
+                  className={`pointer-events-none absolute bottom-1.5 right-3 text-[10px] tabular-nums ${
+                    input.length >= 1900 ? "text-rose-400" : "text-slate-500"
+                  }`}
+                  aria-live="polite"
+                >
+                  {input.length}/2000
+                </span>
+              )}
+            </div>
             {isStreaming ? (
               <motion.button
                 onClick={stopStreaming}
                 whileTap={reduce ? undefined : { scale: 0.95 }}
                 className="relative px-5 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm min-h-[44px]"
                 aria-label="Stop generation"
+                title="Stop (Esc)"
               >
                 {!reduce && (
                   <motion.span
@@ -1158,6 +1868,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
                 whileTap={reduce || !input.trim() ? undefined : { scale: 0.96 }}
                 className="px-5 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium text-sm min-h-[44px]"
                 aria-label="Send message"
+                title="Send (Enter)"
               >
                 Send
               </motion.button>
