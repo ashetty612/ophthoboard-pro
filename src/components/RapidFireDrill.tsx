@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { CasesDatabase, CaseData } from "@/lib/types";
 import { FATAL_FLAWS } from "@/lib/fatal-flaws";
 import { toggleBookmark, getBookmarks } from "@/lib/storage";
+import { cleanCaseLabel } from "@/lib/case-label";
 
 interface RapidFireDrillProps {
   database: CasesDatabase;
@@ -102,7 +103,7 @@ export default function RapidFireDrill({ database, onBack }: RapidFireDrillProps
       // First step (Q6 or Q5 fallback)
       const q6 = c.questions.find((q) => q.number === 6) || c.questions.find((q) => q.number === 5);
       if (q6 && q6.answer) {
-        const dx = c.diagnosisTitle || cc;
+        const dx = cleanCaseLabel(c.diagnosisTitle, cc);
         firstStepItems.push({
           kind: "first-step",
           prompt: `First management step for: ${dx}`,

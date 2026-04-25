@@ -20,6 +20,7 @@ import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateSt
 import { pushAttemptToCloud, pushBookmarkToggle, pushStreakToCloud } from "@/lib/supabase/sync";
 import { getPearlsForCase, QUESTION_TYPE_INFO, getQuestionInfo } from "@/lib/pearls";
 import AIPearlsCard from "./AIPearlsCard";
+import { cleanCaseLabel } from "@/lib/case-label";
 import { getFatalFlawsForCase } from "@/lib/fatal-flaws";
 import { rateCase, type Rating } from "@/lib/srs";
 import { easeOut, easeSpring, fadeUp, staggerMed } from "@/lib/motion";
@@ -80,41 +81,8 @@ function QuestionProgress({ total, current, showAnswer }: { total: number; curre
 // reopen so an accidental tab-close doesn't lose progress.
 const draftKey = (caseId: string) => `cvb.case.draft.v1.${caseId}`;
 
-/**
- * Pick a clean display label for a case header.
- *
- * ~45 cases in the database have malformed `diagnosisTitle` fields —
- * sentence fragments like "is bacterial keratitis, most likely…" or
- * "the majority of patients…" that come from imperfect parsing of
- * the source PDF. Those would render as "Case context: is bacterial
- * keratitis…" which reads broken. This helper detects fragment-style
- * titles and falls back to the (always clean) clinical-vignette title.
- *
- * Heuristic: a real diagnosis title always starts with a capital
- * letter and the first word is NOT a verb / function word that would
- * indicate the string was sliced from mid-sentence.
- */
-function cleanCaseLabel(diagnosisTitle?: string, fallbackTitle?: string): string {
-  const dt = (diagnosisTitle || '').trim();
-  const fb = (fallbackTitle || '').trim();
-  if (!dt) return fb;
-  const firstChar = dt[0];
-  const firstWord = dt.split(/\s+/)[0]?.toLowerCase() || '';
-  const fragmentStarters = new Set([
-    'is', 'was', 'were', 'are', 'be', 'been',
-    'the', 'a', 'an', 'this', 'that', 'these', 'those',
-    'and', 'or', 'but', 'if', 'when', 'while',
-    'it', 'they', 'we', 'i',
-    'has', 'have', 'had', 'do', 'does', 'did',
-    'in', 'on', 'at', 'of', 'for', 'with', 'by', 'from', 'to',
-  ]);
-  // Looks like a fragment if it doesn't start with a capital letter,
-  // or its first word is a known sentence-starter (not a noun phrase).
-  if (firstChar !== firstChar.toUpperCase() || fragmentStarters.has(firstWord)) {
-    return fb || dt;
-  }
-  return dt;
-}
+// cleanCaseLabel moved to src/lib/case-label.ts so other components can
+// share the same logic (RapidFireDrill, AIExaminer, etc.).
 
 interface CaseDraft {
   photoAnswer?: string;
@@ -1274,7 +1242,9 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
           <motion.div variants={fadeUp} className="glass-card rounded-2xl p-8 text-center mb-8">
             <h2 className="text-2xl font-bold text-white mb-2">Case Complete</h2>
             {caseData.diagnosisTitle && (
-              <p className="text-lg text-primary-400 font-medium mb-4">Diagnosis: {caseData.diagnosisTitle}</p>
+              <p className="text-lg text-primary-400 font-medium mb-4">
+                Diagnosis: {cleanCaseLabel(caseData.diagnosisTitle, caseData.title)}
+              </p>
             )}
           </motion.div>
 
