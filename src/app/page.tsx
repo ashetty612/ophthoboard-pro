@@ -567,7 +567,7 @@ export default function Home() {
         {isFirstTime && !examWeekMode && (
           <div className="mb-8 rounded-2xl border border-primary-500/30 bg-gradient-to-br from-primary-500/10 to-violet-500/10 p-6 animate-fade-in-up">
             <p className="text-[11px] text-primary-300 uppercase tracking-[0.2em] font-semibold mb-2">New here? Start in 30 seconds</p>
-            <h3 className="text-lg font-bold text-white mb-3">Pick a workflow below to see how this works.</h3>
+            <h2 className="text-lg font-bold text-white mb-3">Pick a workflow below to see how this works.</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               <button
                 onClick={() => {
@@ -775,9 +775,9 @@ export default function Home() {
         {/* Search Results */}
         {searchQuery && (
           <div className="mb-10 animate-fade-in">
-            <h3 className="text-sm font-semibold text-white mb-4">
+            <h2 className="text-sm font-semibold text-white mb-4">
               <span className="text-slate-500">{filteredCases.length} results for</span> &quot;{searchQuery}&quot;
-            </h3>
+            </h2>
             <div className="grid gap-2 max-h-96 overflow-y-auto">
               {filteredCases.slice(0, 20).map((c) => (
                 <button
@@ -808,7 +808,7 @@ export default function Home() {
         {!searchQuery && (
           <>
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xs text-slate-400 uppercase tracking-[0.2em] font-medium">Subspecialties</h3>
+              <h2 className="text-xs text-slate-400 uppercase tracking-[0.2em] font-medium">Subspecialties</h2>
               <span className="text-xs text-slate-400">{totalActiveCases} total cases</span>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-14" data-tour="subspecialties">
@@ -866,9 +866,9 @@ export default function Home() {
         {!searchQuery && (
           <>
             <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
-              <h3 className="text-xs text-slate-500 uppercase tracking-[0.2em] font-medium">
+              <h2 className="text-xs text-slate-500 uppercase tracking-[0.2em] font-medium">
                 {examWeekMode ? "Exam-Week Modes (High-Yield Only)" : "Study Modes"}
-              </h3>
+              </h2>
               <button
                 onClick={() => setExamWeekMode(!examWeekMode)}
                 data-tour="exam-week"
@@ -1098,7 +1098,7 @@ export default function Home() {
         {/* ABO Exam Info */}
         {!searchQuery && (
           <div className="glass-card rounded-xl p-6 mb-10">
-            <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">About the ABO Oral Examination</h3>
+            <h2 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">About the ABO Oral Examination</h2>
             <div className="divider-glow mb-4" />
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 text-sm mb-5">
               <div>
