@@ -330,7 +330,10 @@ function checkKeywordMatch(userAnswer: string, keyword: string): boolean {
   // Fuzzy/typo match for the full keyword
   if (fuzzyWordMatch(normalizedAnswer, normalizedKeyword)) return true;
 
-  // Check individual significant words (4+ chars) - stricter threshold
+  // Multi-word keyword match — looser than before. If the user hits ~40%
+  // of the significant words from the keyword, count it as a match. This
+  // mirrors how an examiner reads ("you got the gist") instead of the
+  // old strict "must hit half the exact words" rule.
   const keywordWords = normalizedKeyword.split(' ').filter(w => w.length >= 4);
   if (keywordWords.length > 1) {
     const matchedWords = keywordWords.filter(w =>
@@ -338,7 +341,10 @@ function checkKeywordMatch(userAnswer: string, keyword: string): boolean {
       wordBoundaryMatch(normalizedAnswer, stemWord(w)) ||
       fuzzyWordMatch(normalizedAnswer, w)
     );
-    if (matchedWords.length >= Math.ceil(keywordWords.length * 0.5)) return true;
+    const required = keywordWords.length <= 3
+      ? Math.max(1, Math.ceil(keywordWords.length * 0.4))
+      : Math.max(2, Math.ceil(keywordWords.length * 0.4));
+    if (matchedWords.length >= required) return true;
   }
 
   // Stemmed word matching for single important medical terms (5+ chars only)
@@ -389,38 +395,63 @@ export function scoreAnswer(question: Question, userAnswer: string): UserAnswer 
   const maxScore = QUESTION_WEIGHTS[question.number] || 15;
   const effectiveKeywords = keywords.filter(k => k.toLowerCase() !== 'not applicable');
 
+  // Effort credit — reward genuinely substantive answers even if they
+  // don't hit the canonical keywords verbatim. Real ABO examiners give
+  // partial credit for relevant content; rigid verbatim matching here
+  // was the #1 cause of "low score on a perfectly good answer."
+  const wordCount = userAnswer.trim().split(/\s+/).filter(Boolean).length;
+  const effortCredit =
+    wordCount >= 60 ? 0.18 :
+    wordCount >= 30 ? 0.12 :
+    wordCount >= 15 ? 0.06 : 0;
+
   let score: number;
   if (effectiveKeywords.length === 0) {
     score = maxScore;
   } else {
     const matchPercentage = matchedKeywords.length / effectiveKeywords.length;
-    // Apply a slight bonus curve - reward getting most answers right
-    const adjustedPercentage = matchPercentage >= 0.8
-      ? matchPercentage + (1 - matchPercentage) * 0.2
-      : matchPercentage;
+    // Tiered bonus curve — rewards both partial AND complete coverage,
+    // not just near-perfect answers (the old curve only kicked in at 80%).
+    let adjustedPercentage = matchPercentage;
+    if (matchPercentage >= 0.5) {
+      // Above the "thoughtful answer" threshold — boost progressively
+      const bonus = matchPercentage >= 0.8
+        ? (1 - matchPercentage) * 0.50  // strong boost for near-complete
+        : (1 - matchPercentage) * 0.30; // moderate boost for solid partial
+      adjustedPercentage = matchPercentage + bonus;
+    } else if (matchPercentage >= 0.25) {
+      // Some real content — small boost so a half-right answer isn't crushed
+      adjustedPercentage = matchPercentage + (1 - matchPercentage) * 0.18;
+    }
+    // Add effort credit on top — capped so it can't carry an empty answer
+    if (matchedKeywords.length > 0) {
+      adjustedPercentage = Math.min(1, adjustedPercentage + effortCredit);
+    }
     score = Math.round(Math.min(adjustedPercentage, 1) * maxScore);
   }
 
-  // Generate feedback
+  // Generate feedback — thresholds tuned to be more lenient and
+  // more encouraging. Mirrors how a real examiner reads an answer:
+  // they're looking for clinical reasoning, not exact keyword bingo.
   let feedback: string;
   const percentage = effectiveKeywords.length > 0
     ? (matchedKeywords.length / effectiveKeywords.length) * 100
     : 100;
 
-  if (percentage >= 90) {
-    feedback = 'Above Expected (3/3) — Comprehensive response covering key concepts with specificity.';
-  } else if (percentage >= 70) {
-    feedback = 'Expected (2/3) — Solid answer hitting most important points.';
-  } else if (percentage >= 50) {
-    feedback = 'Below Expected (1/3) — Incomplete response. Key elements were missed.';
-  } else if (percentage >= 25) {
-    feedback = 'Unacceptable (0/3) — Major gaps in knowledge. Focused review needed.';
+  if (percentage >= 80) {
+    feedback = 'Above Expected (3/3) — Comprehensive answer covering the key concepts.';
+  } else if (percentage >= 55) {
+    feedback = 'Expected (2/3) — Solid answer hitting the important points.';
+  } else if (percentage >= 30) {
+    feedback = 'Below Expected (1/3) — Partial answer; a few key elements were missed.';
+  } else if (percentage >= 10 || wordCount >= 20) {
+    feedback = 'Borderline — Some relevant content; review the gaps below.';
   } else {
-    feedback = 'Unacceptable (0/3) — Significant deficiency. Review core concepts thoroughly.';
+    feedback = 'Unacceptable (0/3) — Review the core concepts.';
   }
 
   if (missedKeywords.length > 0 && missedKeywords.length <= 5) {
-    feedback += ` Review: ${missedKeywords.slice(0, 3).join('; ')}.`;
+    feedback += ` Worth adding: ${missedKeywords.slice(0, 3).join('; ')}.`;
   }
 
   return {
@@ -444,25 +475,64 @@ export function scorePhotoDescription(
     return { score: 0, maxScore, feedback: 'No description provided.' };
   }
 
+  // Two complementary signals:
+  //   (a) keyword overlap with the model description (the "did they
+  //       mention what mattered?" check), and
+  //   (b) systematic-description bonus — points for using the standard
+  //       framework (modality / laterality / anatomy → finding) which
+  //       examiners explicitly reward.
+  // We're more generous than before because the photo phase is the
+  // entry point to the case and a low score here was demoralizing
+  // candidates who actually wrote a thoughtful description.
+
+  // Stop-words that shouldn't count as "key" overlap
+  const STOP = new Set([
+    'the','and','with','this','that','from','have','has','for','his','her',
+    'are','was','were','will','would','could','should','also','some','one',
+    'two','three','four','five','any','all','can','may','might','show',
+    'shows','showing','seen','image','photo','color','left','right','side','area'
+  ]);
+
   const correctWords = normalizeText(correctDescription)
     .split(' ')
-    .filter(w => w.length >= 3);
-  const userWords = normalizeText(userDescription);
+    .filter(w => w.length >= 4 && !STOP.has(w));
+  const userText = normalizeText(userDescription);
 
-  // Check direct word matches plus stemmed matches
   const matchedWords = correctWords.filter(w =>
-    userWords.includes(w) || userWords.includes(stemWord(w))
+    userText.includes(w) || userText.includes(stemWord(w))
   );
-  const matchPercentage = matchedWords.length / Math.max(correctWords.length, 1);
-  const score = Math.min(Math.round(matchPercentage * maxScore * 1.2), maxScore); // Slight bonus
+  const overlap = matchedWords.length / Math.max(correctWords.length, 1);
+
+  // Systematic-description bonus — does the answer touch the standard
+  // framework? Each present element is worth 0.05 of the percentage,
+  // capped at 0.25 total bonus.
+  const SYSTEMATIC_PATTERNS: RegExp[] = [
+    /\b(slit lamp|fundus|oct|fa|icg|ct|mri|b[- ]?scan|x[- ]?ray|external|anterior segment|posterior segment)\b/i, // modality
+    /\b(od|os|ou|right (eye|side)|left (eye|side)|bilateral|unilateral)\b/i, // laterality
+    /\b(lid|conjunctiva|cornea|anterior chamber|iris|lens|vitreous|retina|disc|macula|periphery|orbit)\b/i, // anatomy
+    /\b(opacity|edema|hemorrhage|infiltrate|injection|ulcer|exudate|drusen|cup|nv|pigment|atrophy|scar|membrane|detachment|fluid|cyst|nodule|mass|telangiectasia)\b/i, // finding
+    /\b(mild|moderate|severe|focal|diffuse|peripheral|central|inferior|superior|nasal|temporal)\b/i, // descriptor
+  ];
+  const systematicHits = SYSTEMATIC_PATTERNS.filter(re => re.test(userDescription)).length;
+  const systematicBonus = Math.min(0.25, systematicHits * 0.05);
+
+  // Effort credit — a substantive paragraph (≥30 words) gets a small
+  // tailwind so candidates aren't penalised for using their own words.
+  const wordCount = userDescription.trim().split(/\s+/).filter(Boolean).length;
+  const effortBonus = wordCount >= 60 ? 0.10 : wordCount >= 30 ? 0.06 : 0;
+
+  const adjusted = Math.min(1, overlap * 1.25 + systematicBonus + effortBonus);
+  const score = Math.round(adjusted * maxScore);
 
   let feedback: string;
-  if (matchPercentage >= 0.6) {
-    feedback = 'Excellent photo description! You identified the key findings.';
-  } else if (matchPercentage >= 0.35) {
-    feedback = 'Adequate description. Try to be more specific about clinical findings.';
+  if (adjusted >= 0.7) {
+    feedback = 'Excellent — systematic, specific, and on-point.';
+  } else if (adjusted >= 0.45) {
+    feedback = 'Solid description. Tighten the framework next time (modality → laterality → anatomy → finding).';
+  } else if (adjusted >= 0.25 || wordCount >= 25) {
+    feedback = 'Some good observations — be more specific about modality, laterality, and the anatomical layers you\'re seeing.';
   } else {
-    feedback = 'Your description missed key findings. Practice describing clinical photos systematically.';
+    feedback = 'Practice the systematic framework: modality, laterality, normal anatomy, then abnormal findings.';
   }
 
   return { score, maxScore, feedback };

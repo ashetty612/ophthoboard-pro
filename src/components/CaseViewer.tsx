@@ -17,7 +17,7 @@ import {
   getGradeBgColor,
 } from "@/lib/scoring";
 import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateStudyStreak } from "@/lib/storage";
-import { getPearlsForCase, QUESTION_TYPE_INFO } from "@/lib/pearls";
+import { getPearlsForCase, QUESTION_TYPE_INFO, getQuestionInfo } from "@/lib/pearls";
 import { getFatalFlawsForCase } from "@/lib/fatal-flaws";
 import { rateCase, type Rating } from "@/lib/srs";
 import { easeOut, easeSpring, fadeUp, staggerMed } from "@/lib/motion";
@@ -638,11 +638,11 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   // QUESTIONS PHASE
   if (phase === "questions") {
     const question = caseData.questions[currentQuestion];
-    const questionInfo = QUESTION_TYPE_INFO[question.number] || {
-      name: `Question ${question.number}`,
-      description: "",
-      tips: "",
-    };
+    // Infer question type from the actual question text (not its slot
+    // number). Many cases have a "Describe what you see" stem at slot 1
+    // rather than the canonical Q1=differential — using the inferred
+    // category gives the right name/description/tip per question.
+    const questionInfo = getQuestionInfo(question.question);
     const teaching = question.teaching;
     const currentLen = userAnswers[currentQuestion].length;
 
@@ -1098,7 +1098,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                         <span className={`text-sm font-bold ${pct >= 70 ? "text-emerald-400" : pct >= 50 ? "text-amber-400" : "text-rose-400"}`}>{q.number}</span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-white">{QUESTION_TYPE_INFO[q.number]?.name || `Question ${q.number}`}</p>
+                        <p className="text-sm font-medium text-white">{getQuestionInfo(q.question).name}</p>
                         <p className="text-xs text-slate-400">{answer.feedback}</p>
                       </div>
                     </div>

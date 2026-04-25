@@ -576,35 +576,170 @@ export function getPearlsForCase(subspecialty: string, title: string): TeachingP
 // Element 8: FOLLOW-UP (Q6) — explicit interval + what to check (HEAVILY WEIGHTED)
 //
 // Management + Follow-up = ~40% of ABO score — highest yield area
-export const QUESTION_TYPE_INFO: { [key: number]: { name: string; description: string; tips: string } } = {
-  1: {
+//
+// IMPORTANT: question text varies a LOT across our 432 cases. ~84 cases
+// have Q1 = "Describe what you see in the image" rather than the canonical
+// Q1 = differential. Always classify per the actual question text via
+// `inferQuestionCategory()` / `getQuestionInfo()` — don't trust the slot.
+
+export type QuestionCategory =
+  | 'photo-describe'
+  | 'differential'
+  | 'history'
+  | 'exam'
+  | 'workup'
+  | 'diagnosis'
+  | 'management'
+  | 'follow-up'
+  | 'vignette-mcq'
+  | 'general';
+
+export interface QuestionTypeInfo {
+  name: string;
+  description: string;
+  tips: string;
+  category: QuestionCategory;
+}
+
+const CATEGORY_INFO: Record<QuestionCategory, Omit<QuestionTypeInfo, 'category'>> = {
+  'photo-describe': {
+    name: 'Photo Description',
+    description: 'Systematically describe what you see — modality, laterality, anatomy, then abnormal findings. Resist jumping to diagnosis.',
+    tips: 'Open with: imaging modality (slit lamp / fundus / OCT / FA / CT / MRI), laterality (OD / OS / OU), then walk anatomy (lid → conjunctiva → cornea → AC → iris → lens → vitreous → disc → macula → vessels → periphery). Use precise terms: collarettes, dendrite, KP, hypopyon, NVI, RPE atrophy. Save the diagnosis for the next question.',
+  },
+  differential: {
     name: 'Differential Diagnosis',
-    description: '3-4 entities, ordered by likelihood. Always include the can\'t-miss life-, eye-, or sight-threatening diagnosis.',
-    tips: 'Lead with the most likely first, then life/sight-threatening rule-outs (GCA, retinoblastoma, open globe). Include 3-5 differentials ranked by frequency. After you give your differential, the examiner will usually confirm the diagnosis and move on. Having it first shows confidence.',
+    description: '3–5 entities ordered most-likely first, with the can\'t-miss life-/sight-threatening diagnosis included.',
+    tips: 'Lead with the most likely. Always tag a "can\'t-miss" rule-out (GCA, retinoblastoma, open globe, endophthalmitis, AAC) when it fits the presentation. Group by mechanism if helpful (infectious vs. inflammatory vs. vascular). Be ready to defend each entity in one sentence.',
   },
-  2: {
+  history: {
     name: 'Focused History',
-    description: 'Ask focused, hypothesis-driven questions — NOT a full review of systems.',
-    tips: 'Target onset, duration, pain, vision change, trauma, systemic disease (DM, HTN, autoimmune), meds (steroids, HCQ, tamsulosin, anticoagulants), family history. Each question should help narrow your differential. Quality over quantity.',
+    description: 'Hypothesis-driven questions — NOT a full ROS. Each question should narrow your differential.',
+    tips: 'Target: onset, duration, pain, vision change, trauma, contact-lens use, systemic disease (DM, HTN, autoimmune), meds (steroids, HCQ, tamsulosin, anticoagulants), allergies, family history, prior ocular surgery. Quality over quantity. State why each question matters.',
   },
-  3: {
+  exam: {
     name: 'Targeted Examination',
-    description: 'State what you want on exam — VA, pupils (RAPD), IOP, motility, CVF, slit lamp, DFE — tailored to the complaint.',
-    tips: 'Always start with: VA, pupils with swinging flashlight (RAPD), IOP, confrontation fields. Then targeted exam based on suspected diagnosis. Name specific signs: Shafer sign, Seidel test, forced duction, NVI on gonioscopy. The examiner scores your PROCESS.',
+    description: 'VA, pupils (RAPD), IOP, motility, CVF, slit lamp, DFE — tailored to the chief complaint.',
+    tips: 'Start with the basics (VA → pupils with swinging flashlight → IOP → CVF → motility), then targeted. Name the specific signs you\'d look for (Shafer, Seidel, forced duction, NVI on gonioscopy, RPE clumping). Examiners score your PROCESS, not just findings.',
   },
-  4: {
+  workup: {
     name: 'Targeted Workup',
-    description: 'Targeted labs/imaging (OCT, FA, B-scan, MRI, CBC, ESR/CRP) — explain WHY each is ordered.',
+    description: 'Pertinent labs/imaging only (OCT, FA, B-scan, MRI/CT, CBC, ESR/CRP) — justify each.',
     tips: 'Order ONLY pertinent tests — shotgunning loses points. For each test, state what you expect to find and how it changes management. Non-invasive before invasive. Sometimes "no additional testing" IS the right answer.',
   },
-  5: {
+  diagnosis: {
+    name: 'Diagnosis',
+    description: 'Commit to your leading diagnosis with the reasoning that supports it.',
+    tips: 'State the diagnosis in one sentence. Cite 2–3 supporting findings. If uncertain, name the differential you\'re still considering and the test that would distinguish.',
+  },
+  management: {
     name: 'Management',
-    description: 'Specific treatment: drug name + dose + route + frequency. What to counsel and when to refer/co-manage.',
-    tips: 'Management is ~30% of your score alone. Be specific: "prednisolone 1% q1h" not "steroid drops." Least to most invasive UNLESS emergency. Reference landmark trials (EVS, ONTT, DRCR.net). Anticipate curveballs: allergies, complications, treatment failure. Always mention what you\'d counsel the patient.',
+    description: 'Specific treatment: drug + dose + route + frequency. Counsel + when to refer/co-manage.',
+    tips: 'Management is ~30% of the score alone. Be specific: "prednisolone 1% q1h OD" — not "steroid drops." Least-to-most invasive UNLESS emergency. Reference landmark trials (EVS, ONTT, DRCR.net) when relevant. Anticipate curveballs (allergies, complications, treatment failure). Always say what you\'d counsel the patient.',
   },
-  6: {
+  'follow-up': {
     name: 'Follow-Up',
-    description: 'Explicit follow-up interval and what you would check. This is the step most candidates forget — it is HEAVILY weighted.',
-    tips: 'State a SPECIFIC interval: "1 week" not "soon." State what you would check at follow-up. Include: return precautions (new floaters, vision loss, increasing pain), activity restrictions, driving restrictions if applicable. Follow-up accounts for ~20% of the question score and is the most commonly omitted element.',
+    description: 'Explicit interval + what you would check. The most-forgotten element — heavily weighted.',
+    tips: 'State a SPECIFIC interval ("1 week," not "soon"). State what you\'d check at follow-up. Include return precautions (new floaters, vision loss, increasing pain) and activity/driving restrictions if applicable. ~20% of the question score; the most commonly omitted element.',
   },
+  'vignette-mcq': {
+    name: 'Knowledge Question',
+    description: 'A focused knowledge probe (often best-/least-likely or EXCEPT format).',
+    tips: 'Read the stem twice. For EXCEPT/LEAST questions, identify the four that DO apply and the one that doesn\'t. Commit with one-sentence reasoning. Don\'t hedge.',
+  },
+  general: {
+    name: 'Question',
+    description: 'Answer the question directly with the most clinically relevant content.',
+    tips: 'Be specific. Use ophthalmology terminology, drug names + doses where relevant, and cite landmark trials when they apply. Avoid vague answers.',
+  },
+};
+
+/**
+ * Detect the ABO question category from the question text itself, instead
+ * of trusting position. Picks the right label, description, and tip per
+ * question — handles the ~84 cases where Q1 is "Describe what you see"
+ * rather than the canonical Q1 = differential.
+ */
+export function inferQuestionCategory(questionText: string): QuestionCategory {
+  const q = (questionText || '').toLowerCase().trim();
+
+  // Order matters: rules higher up take precedence. We check the most
+  // specific patterns first so e.g. "tests to rule out your #1 diagnosis"
+  // resolves to `workup` rather than `diagnosis`.
+
+  // 1. MCQ vignette — REQUIRES the BCSC/textbook format (EXCEPT / LEAST /
+  //    "all of the following" / "which one of the following"). A bare
+  //    "most likely diagnosis" is a clinical question, not an MCQ stem.
+  if (/\b(except|least likely|all of the following|which (one )?of the following)\b/i.test(q)) {
+    return 'vignette-mcq';
+  }
+
+  // 2. Photo description — only when the prompt is genuinely about
+  //    describing the image (not "describe how you'd treat ..." etc).
+  if (/^(describe|what (do|can) you see|please describe)/i.test(q) ||
+      /\bdescribe (what you see|the (image|photo|finding))/i.test(q)) {
+    return 'photo-describe';
+  }
+
+  // 3. Follow-up / counsel — checked BEFORE management because Q6
+  //    questions often mention "treatment" while their primary subject
+  //    is the follow-up plan, prognosis, or what to tell the patient.
+  if (/\b(follow[- ]?up|natural history|prognosis|when (do|will) you (see|reassess|recheck)|tell (your|the) patient|counsel)\b/i.test(q)) {
+    return 'follow-up';
+  }
+
+  // 4. Workup — checked BEFORE management so "tests to rule out your #1
+  //    diagnosis" classifies correctly.
+  if (/\b(test|tests|workup|work[- ]?up|labs?|imaging|rule (in|out)|investigations?|what (do|would) you order|fluorescein angiogram|fa\b|oct\b|b[- ]?scan|crp|esr|cbc)\b/i.test(q)) {
+    return 'workup';
+  }
+
+  // 5. Management
+  if (/\b(treat|treatment|manage|management|surger(y|ies|ical)|medication|therapy|antibiotic|drops?|prescribe|how (do|will|would) you (manage|treat|approach|handle))\b/i.test(q)) {
+    return 'management';
+  }
+
+  // 6. Differential
+  if (/\b(differential|ddx)\b/i.test(q)) return 'differential';
+
+  // 7. Single-best-diagnosis questions (after workup/mgmt to avoid
+  //    swallowing those).
+  if (/\b(most likely diagnosis|leading diagnosis|working diagnosis|what is your (likely )?diagnosis|what is the diagnosis)\b/i.test(q)) {
+    return 'diagnosis';
+  }
+
+  // 8. Exam
+  if (/\b(exam|examination|examine|look for|find on exam|physical|on slit lamp|on dilated)\b/i.test(q)) {
+    return 'exam';
+  }
+
+  // 9. History
+  if (/\b(history|ask the patient|questions (do|would) you ask|what would you ask|what (do|would) you (ask|want to know))\b/i.test(q)) {
+    return 'history';
+  }
+
+  // 10. Catch-all "what is your assessment?" → diagnosis-leaning
+  if (/\b(assessment|impression)\b/i.test(q)) return 'diagnosis';
+
+  return 'general';
+}
+
+/** Per-question info derived from the question text. */
+export function getQuestionInfo(questionText: string): QuestionTypeInfo {
+  const category = inferQuestionCategory(questionText);
+  return { ...CATEGORY_INFO[category], category };
+}
+
+/**
+ * @deprecated — kept for backwards compat with code that still keys by
+ * question.number. Prefer `getQuestionInfo(question.question)` which
+ * inspects the actual prompt text.
+ */
+export const QUESTION_TYPE_INFO: { [key: number]: { name: string; description: string; tips: string } } = {
+  1: { name: CATEGORY_INFO.differential.name, description: CATEGORY_INFO.differential.description, tips: CATEGORY_INFO.differential.tips },
+  2: { name: CATEGORY_INFO.history.name, description: CATEGORY_INFO.history.description, tips: CATEGORY_INFO.history.tips },
+  3: { name: CATEGORY_INFO.exam.name, description: CATEGORY_INFO.exam.description, tips: CATEGORY_INFO.exam.tips },
+  4: { name: CATEGORY_INFO.workup.name, description: CATEGORY_INFO.workup.description, tips: CATEGORY_INFO.workup.tips },
+  5: { name: CATEGORY_INFO.management.name, description: CATEGORY_INFO.management.description, tips: CATEGORY_INFO.management.tips },
+  6: { name: CATEGORY_INFO['follow-up'].name, description: CATEGORY_INFO['follow-up'].description, tips: CATEGORY_INFO['follow-up'].tips },
 };
