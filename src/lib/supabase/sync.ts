@@ -279,7 +279,7 @@ export async function pushStreakToCloud(): Promise<void> {
       {
         user_id: userId,
         current_streak: local.current,
-        last_attempt_date: local.lastDate,
+        last_date: local.lastDate,
       },
       { onConflict: "user_id" }
     );
@@ -298,7 +298,7 @@ export async function pullStreakFromCloud(): Promise<void> {
     if (!userId) return;
     const { data, error } = await sb
       .from("streaks")
-      .select("current_streak, last_attempt_date")
+      .select("current_streak, last_date")
       .eq("user_id", userId)
       .maybeSingle();
     if (error || !data) return;
@@ -308,11 +308,11 @@ export async function pullStreakFromCloud(): Promise<void> {
     // (the more-recent device) wins and gets pushed back up next save.
     const cloudIsNewer =
       !local.lastDate ||
-      (data.last_attempt_date && new Date(data.last_attempt_date) > new Date(local.lastDate));
+      (data.last_date && new Date(data.last_date) > new Date(local.lastDate));
     if (cloudIsNewer) {
       const merged = {
         current: Math.max(local.current, data.current_streak),
-        lastDate: data.last_attempt_date || local.lastDate,
+        lastDate: data.last_date || local.lastDate,
       };
       safeSetItem(STREAK_KEY, JSON.stringify(merged));
     } else {

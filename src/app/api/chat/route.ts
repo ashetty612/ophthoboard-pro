@@ -108,6 +108,13 @@ function toGeminiBody(
       temperature,
       maxOutputTokens: maxTokens,
       responseModalities: ["TEXT"],
+      // Gemini 2.5 / 3 Flash count "thinking" tokens against
+      // maxOutputTokens by default, which silently truncates short
+      // outputs (we observed pearls cutting off mid-sentence after
+      // ~165 visible tokens despite a 1400 budget). Cap thinking at
+      // a small slice for terse modes; the model can still reason
+      // briefly but won't consume the whole budget.
+      thinkingConfig: { thinkingBudget: 256 },
     },
     // safetySettings loose for medical content (education)
     safetySettings: [
@@ -274,24 +281,28 @@ async function callOllama(
 /** Per-mode ceilings on model output length. Keeps Gemini fast + cheap for
  *  terse modes (viva / pearls) while still giving deep-dive enough headroom. */
 function maxTokensForMode(mode?: string | null): number {
+  // Bumped across the board after observing Gemini 3 Flash truncate
+  // outputs that sat well below the previous limits — some of the
+  // budget gets consumed by the model's internal thinking pass even
+  // with thinkingBudget capped, so we leave more headroom.
   switch (mode) {
     case "viva":
     case "quiz":
     case "ddx-drill":
-      return 900;
-    case "pearls":
       return 1400;
+    case "pearls":
+      return 2200;
     case "soap":
     case "case-builder":
-      return 1800;
+      return 2600;
     case "examiner":
     case "tutor":
-      return 2400;
-    case "deep-dive":
       return 3200;
+    case "deep-dive":
+      return 4000;
     case "free-chat":
     default:
-      return 2000;
+      return 2800;
   }
 }
 
