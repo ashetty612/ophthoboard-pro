@@ -34,6 +34,8 @@ import { analyzeWeaknesses } from "@/lib/weakness-quiz";
 import { getAttempts } from "@/lib/storage";
 import { useGlobalKeyboard, type GlobalView } from "@/lib/use-global-keyboard";
 import HeatmapView from "@/components/HeatmapView";
+import HomeSkeleton from "@/components/HomeSkeleton";
+import CommandPalette from "@/components/CommandPalette";
 import StudyModeCard, { type StudyModeSize } from "@/components/StudyModeCard";
 import FeatureMarquee from "@/components/FeatureMarquee";
 import { motion } from "framer-motion";
@@ -242,19 +244,11 @@ export default function Home() {
     : [];
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-float mb-4">
-            <EyeLogo size={56} />
-          </div>
-          <div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mx-auto">
-            <div className="h-full w-1/2 bg-primary-500 rounded-full animate-pulse" />
-          </div>
-          <p className="text-slate-500 text-sm mt-4 tracking-wide">Loading cases...</p>
-        </div>
-      </div>
-    );
+    // Skeleton mirrors the actual page layout so the user sees the
+    // SHAPE filling in instead of staring at a blank screen and
+    // suddenly getting the full render. Way better perceived perf
+    // when the 6 MB cases JSON takes a second on slower networks.
+    return <HomeSkeleton />;
   }
 
   if (!database) {
@@ -1187,6 +1181,35 @@ export default function Home() {
 
       {/* First-time onboarding tour — renders only if localStorage flag unset. */}
       <OnboardingTour enabled={!loading && !!database} />
+
+      {/* Cmd/Ctrl+K command palette — global navigation + case search.
+          Mounts only after the database loads so the case index is ready. */}
+      {database && (
+        <CommandPalette
+          cases={database.subspecialties.flatMap((s) =>
+            s.cases.map((c) => ({
+              id: c.id,
+              title: c.title,
+              subspecialty: c.subspecialty,
+              diagnosisTitle: c.diagnosisTitle,
+            }))
+          )}
+          onNavigate={(view) => {
+            setCurrentView(view as View);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          onOpenCase={(caseId) => {
+            const found = database.subspecialties
+              .flatMap((s) => s.cases)
+              .find((c) => c.id === caseId);
+            if (found) {
+              setSelectedCase(found);
+              setCurrentView("case");
+              setCameFromHome(true);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
