@@ -42,7 +42,8 @@ if (missing.length) {
 const body = {
   external_email_enabled: true,
   smtp_host: process.env.SMTP_HOST,
-  smtp_port: Number(process.env.SMTP_PORT),
+  // Supabase Management API quirk — expects port as a string, not a number.
+  smtp_port: String(process.env.SMTP_PORT),
   smtp_user: process.env.SMTP_USER,
   smtp_pass: process.env.SMTP_PASS,
   smtp_admin_email: process.env.SMTP_ADMIN_EMAIL,

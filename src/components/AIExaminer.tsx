@@ -34,6 +34,15 @@ interface AIExaminerProps {
 interface Message {
   role: "system" | "user" | "assistant";
   content: string;
+  /**
+   * `true` if this message is a synthetic stage-direction sent to the
+   * model to nudge its first reply (e.g., "the candidate is now
+   * looking at the case — wait for them to speak"). Stays in the
+   * messages array so the model sees it, but is filtered out of the
+   * visible chat so the user doesn't see internal director's notes
+   * masquerading as something they typed.
+   */
+  internal?: boolean;
 }
 
 type ExaminerMode =
@@ -1258,7 +1267,9 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
     setStarted(true);
 
     if (mode !== "tutor" && mode !== "free-chat") {
-      void streamAndAppend([...initial, { role: "user", content: followUpPrompt }]);
+      // Mark the kickoff prompt as internal so the user doesn't see it
+      // in the chat; the model still gets it as a "user" turn.
+      void streamAndAppend([...initial, { role: "user", content: followUpPrompt, internal: true }]);
     }
   }, [mode, currentCase, subspecialtyFocus, database, streamAndAppend]);
 
@@ -1536,7 +1547,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
   }
 
   // ─── CHAT INTERFACE ──────────────────────────────────────────────────
-  const visibleMessages = messages.filter((m) => m.role !== "system");
+  const visibleMessages = messages.filter((m) => m.role !== "system" && !m.internal);
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @theme {
+  /* Custom xs breakpoint at 480px — phone-portrait threshold. Used to
+   * show/hide the brand wordmark in the top nav so the header fits
+   * without horizontal scroll on real phones (typical 360–414px). */
+  --breakpoint-xs: 480px;
+
   /* Clear Vision Ed-inspired: emerald brand primary (#047962), steel-blue
    * secondary. Retuned from cyan to read warmer/clinical. The old
    * --color-primary-* slots are kept but map to the emerald scale so
@@ -167,6 +172,14 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+/* Sticky-header variant — same look but more opaque so page content
+ * doesn't bleed through when the user scrolls. We picked .92 by trial:
+ * still feels like glass at the edges but kills the readability bug
+ * where h2's underneath the header showed through. */
+.glass-card.sticky.top-0 {
+  background: rgba(8, 14, 28, 0.92);
 }
 
 .glass-card-light {

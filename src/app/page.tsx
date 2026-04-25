@@ -487,9 +487,11 @@ export default function Home() {
       {/* Header */}
       <header className="border-b border-slate-800/80 glass-card sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 min-w-0">
+          {/* Brand — wordmark hidden on xs so the nav has room to fit
+              all 5 items + the auth chip without horizontal scroll. */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
             <CVBLogo size={36} />
-            <div className="min-w-0">
+            <div className="min-w-0 hidden xs:block">
               <h1 className="text-base sm:text-lg font-bold text-white tracking-tight leading-none">
                 Clear Vision <span className="font-[family-name:var(--font-fraunces)] italic text-primary-300">Boards</span>
               </h1>
@@ -498,19 +500,23 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <nav aria-label="Primary" className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto">
+          <nav aria-label="Primary" className="flex items-center gap-0.5 sm:gap-1 min-w-0">
             {[
-              { label: "Review", view: "review" as View, style: "text-slate-300 hover:text-white" },
-              { label: "Exam", view: "exam" as View, style: "text-amber-400/90 hover:text-amber-300" },
-              { label: "AI Tutor", view: "ai-examiner" as View, style: "text-primary-400/90 hover:text-primary-300" },
-              { label: "Progress", view: "dashboard" as View, style: "text-white bg-slate-800 hover:bg-slate-700" },
+              { label: "Review", short: "Rev", view: "review" as View, style: "text-slate-300 hover:text-white" },
+              { label: "Exam", short: "Exam", view: "exam" as View, style: "text-amber-400/90 hover:text-amber-300" },
+              { label: "AI Tutor", short: "AI", view: "ai-examiner" as View, style: "text-primary-400/90 hover:text-primary-300" },
+              { label: "Progress", short: "•", view: "dashboard" as View, style: "text-white bg-slate-800 hover:bg-slate-700" },
             ].map((item) => (
               <button
                 key={item.view}
                 onClick={() => setCurrentView(item.view)}
-                className={`px-2.5 sm:px-3 py-2 min-h-[44px] rounded-lg text-[13px] sm:text-sm font-medium transition-colors whitespace-nowrap ${item.style}`}
+                className={`px-2 sm:px-3 py-2 min-h-[44px] rounded-lg text-[12px] sm:text-sm font-medium transition-colors whitespace-nowrap ${item.style}`}
+                aria-label={item.label}
+                title={item.label}
               >
-                {item.label}
+                {/* Short label on xs, full label on sm+ */}
+                <span className="sm:hidden">{item.short}</span>
+                <span className="hidden sm:inline">{item.label}</span>
               </button>
             ))}
             <AuthButton />

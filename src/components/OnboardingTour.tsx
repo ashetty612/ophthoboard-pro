@@ -16,7 +16,7 @@ const STEPS: TourStep[] = [
   {
     target: null,
     label: "Welcome",
-    title: "Welcome to OphthoBoard Pro.",
+    title: "Welcome to Clear Vision Boards.",
     body: "We're going to do a 60-second tour so you know where to start. You can skip anytime.",
   },
   {
