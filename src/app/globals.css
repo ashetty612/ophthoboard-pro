@@ -190,6 +190,13 @@ h1, h2, h3, h4, h5, h6 {
   background: rgba(8, 14, 28, 0.92);
 }
 
+/* <kbd> a11y — the default slate-500 on slate-800 was 4.39:1, just under
+ * WCAG AA's 4.5:1 cutoff for small text. Force a slightly lighter text
+ * color (#cbd5e1, slate-300, ~10:1) so every <kbd> on the site hits AAA. */
+kbd {
+  color: var(--color-slate-300);
+}
+
 .glass-card-light {
   background: rgba(30, 41, 59, 0.5);
   backdrop-filter: blur(12px);
