@@ -85,7 +85,11 @@
    * (10–12px). #7d8ea8 raises contrast to ~6.4:1 and is visually a
    * very minor lift. Changes 142 usages across the app in one go. */
   --color-slate-500: #7d8ea8;
-  --color-slate-600: #475569;
+  /* Bumped from default #475569 (2.62:1 on slate-950, fails AA) to
+   * #6b7c97 (~5.3:1). Used for very-low-emphasis chrome (footer
+   * timestamps, kbd hints); the lift is intentionally moderate so
+   * the ranking against slate-500 (#7d8ea8) is preserved. */
+  --color-slate-600: #6b7c97;
   --color-slate-700: #334155;
   --color-slate-800: #1e293b;
   --color-slate-900: #0f172a;

@@ -120,11 +120,14 @@ export default function StudyModeCard({
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h4
+              {/* h3 not h4 — the parent section "Study Modes" is h2,
+                  so the next valid level is h3. h4 here was producing a
+                  Lighthouse heading-order warning. */}
+              <h3
                 className={`font-[family-name:var(--font-space-grotesk)] font-semibold text-white transition-colors group-hover:text-primary-200 ${isFeature ? "text-lg sm:text-xl" : "text-sm sm:text-[15px]"} tracking-tight leading-tight`}
               >
                 {label}
-              </h4>
+              </h3>
               {badge && (
                 <span
                   className={`inline-flex items-center rounded-full border px-2 py-[1px] text-[9px] font-bold uppercase tracking-[0.12em] ${BADGE_CONFIG[badge].cls}`}
