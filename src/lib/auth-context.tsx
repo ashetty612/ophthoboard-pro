@@ -74,8 +74,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setSupabaseSession(data.session);
         setLoading(false);
+        // First-load sync: pull cloud history if signed in.
+        if (data.session?.user) {
+          import("./supabase/sync").then((m) => void m.pullAndMergeAttempts());
+        }
       });
-      const { data: sub } = sb.auth.onAuthStateChange((_event, s) => setSupabaseSession(s));
+      const { data: sub } = sb.auth.onAuthStateChange((event, s) => {
+        setSupabaseSession(s);
+        // Pull-and-merge on every sign-in event so signing in on a new
+        // device gives the user their progress immediately.
+        if (event === "SIGNED_IN" && s?.user) {
+          import("./supabase/sync").then((m) => void m.pullAndMergeAttempts());
+        }
+      });
       return () => {
         cancelled = true;
         sub.subscription.unsubscribe();

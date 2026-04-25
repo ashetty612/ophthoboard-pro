@@ -4,6 +4,7 @@ import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuroraBackground from "@/components/AuroraBackground";
 import { AuthProvider } from "@/lib/auth-context";
+import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -54,6 +55,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%23047962'/><stop offset='100%' stop-color='%23347896'/></linearGradient></defs><circle cx='50' cy='50' r='45' fill='url(%23g)'/><circle cx='50' cy='50' r='16' fill='%23020a13'/><circle cx='44' cy='44' r='5' fill='%23ffffff' opacity='0.7'/></svg>",
+    apple: "/mascots/cve-icon.png",
+  },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CVB",
   },
 };
 
@@ -71,6 +79,7 @@ export default function RootLayout({
             {children}
           </ErrorBoundary>
         </AuthProvider>
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );

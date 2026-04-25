@@ -22,7 +22,14 @@ export default function ReviewMode({ database, onBack, onSelectCase }: ReviewMod
 
   if (!currentCase) return null;
 
-  const pearls = getPearlsForCase(currentCase.subspecialty, currentCase.title);
+  const pearls = getPearlsForCase({
+    subspecialty: currentCase.subspecialty,
+    title: currentCase.title,
+    diagnosisTitle: currentCase.diagnosisTitle,
+    presentation: currentCase.presentation,
+    photoDescription: currentCase.photoDescription,
+    casePearls: currentCase.casePearls,
+  });
 
   return (
     <div className="min-h-screen">

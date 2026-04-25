@@ -1,0 +1,25 @@
+{
+  "name": "Clear Vision Boards",
+  "short_name": "CVB",
+  "description": "ABO oral boards prep — 432 cases, AI examiner, 25 AAO PPPs, 46 trials, 27 fatal flaws.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020a13",
+  "theme_color": "#020a13",
+  "icons": [
+    {
+      "src": "/mascots/cve-icon.png",
+      "sizes": "340x360",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mascots/cve-icon.png",
+      "sizes": "340x360",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["education", "medical"]
+}

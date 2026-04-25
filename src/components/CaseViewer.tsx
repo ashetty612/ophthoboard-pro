@@ -17,7 +17,9 @@ import {
   getGradeBgColor,
 } from "@/lib/scoring";
 import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateStudyStreak } from "@/lib/storage";
+import { pushAttemptToCloud } from "@/lib/supabase/sync";
 import { getPearlsForCase, QUESTION_TYPE_INFO, getQuestionInfo } from "@/lib/pearls";
+import AIPearlsCard from "./AIPearlsCard";
 import { getFatalFlawsForCase } from "@/lib/fatal-flaws";
 import { rateCase, type Rating } from "@/lib/srs";
 import { easeOut, easeSpring, fadeUp, staggerMed } from "@/lib/motion";
@@ -101,9 +103,25 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const previousAttempts = useMemo(() => getAttemptsForCase(caseData.id), [caseData.id]);
+  // Don't pass casePearls into retrieval — they're rendered separately
+  // in their own amber block below. We just want the smart-retrieved
+  // pearls here (subspecialty knowledge + strategy tips).
   const pearls = useMemo(
-    () => getPearlsForCase(caseData.subspecialty, caseData.title),
-    [caseData.subspecialty, caseData.title]
+    () =>
+      getPearlsForCase({
+        subspecialty: caseData.subspecialty,
+        title: caseData.title,
+        diagnosisTitle: caseData.diagnosisTitle,
+        presentation: caseData.presentation,
+        photoDescription: caseData.photoDescription,
+      }),
+    [
+      caseData.subspecialty,
+      caseData.title,
+      caseData.diagnosisTitle,
+      caseData.presentation,
+      caseData.photoDescription,
+    ]
   );
   const fatalFlaws = useMemo(
     () =>
@@ -144,6 +162,24 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
 
   const handleSubmitAnswer = () => setShowAnswer(true);
 
+  /**
+   * Go BACK to the previous question without exiting the case.
+   * Preserves the user's typed answer + scoring state for that question.
+   * If we're on Q1, it bounces back to the photo phase.
+   */
+  const handlePreviousQuestion = () => {
+    setShowAnswer(false);
+    setShowTeaching(false);
+    setShowPitfalls(false);
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1);
+    } else {
+      // Bounce back to the photo phase so the user can re-read the
+      // image / re-edit their description without restarting.
+      setPhase("photo");
+    }
+  };
+
   const handleNextQuestion = () => {
     setShowAnswer(false);
     setShowTeaching(false);
@@ -174,6 +210,8 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
           timeSpentSeconds: Math.round((Date.now() - startTime) / 1000),
         };
         saveAttempt(attempt);
+        // Fire-and-forget cloud sync. No-op when not signed in.
+        void pushAttemptToCloud(attempt);
         updateStudyStreak();
         setPhase("results");
         setSubmitting(false);
@@ -467,14 +505,47 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
             {pearls.length > 0 && (
               <motion.div
                 variants={fadeUp}
-                className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 mb-6"
+                className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 mb-4"
               >
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                  Study Tip
-                </p>
-                <p className="text-sm text-slate-400">{pearls[0].pearl}</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Topic Pearls (retrieved)
+                  </p>
+                  <span className="text-[10px] text-slate-600">{pearls.length} matched</span>
+                </div>
+                <ul className="space-y-2">
+                  {pearls.map((p, i) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-2 text-sm text-slate-400"
+                    >
+                      <span className="text-primary-400/70 mt-1 shrink-0" aria-hidden>◇</span>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-0.5">
+                          {p.category}
+                        </p>
+                        <p className="leading-relaxed">{p.pearl}</p>
+                        {p.examTip && (
+                          <p className="text-xs text-slate-500 italic mt-1">Exam tip: {p.examTip}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </motion.div>
             )}
+
+            {/* AI-pearls — generate fresh pearls live for this exact case
+                using Lensley. Shown only after the static topic pearls so
+                the user always sees the curated set first. */}
+            <motion.div variants={fadeUp} className="mb-6">
+              <AIPearlsCard
+                caseTitle={caseData.title}
+                diagnosis={caseData.diagnosisTitle || caseData.title}
+                presentation={caseData.presentation}
+                subspecialty={caseData.subspecialty}
+              />
+            </motion.div>
 
             <motion.div variants={fadeUp} className="mb-6">
               <AudioNarrator
@@ -651,26 +722,70 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
         <div className="min-h-screen">
           {renderHeader()}
           <div className="max-w-4xl mx-auto px-4 py-8">
-            {hasImage && (
+            {/* Sticky case context — pinned at the top of every question
+                so the candidate can re-read the presentation, the photo
+                description, and toggle the image without losing place.
+                Collapsible (click to fold) to reclaim screen space. */}
+            <div className="mb-4 rounded-xl border border-slate-700/40 bg-slate-900/40 overflow-hidden">
               <button
                 onClick={() => setShowImage(!showImage)}
-                className="mb-4 flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
+                className="w-full px-4 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-slate-800/40 transition-colors"
+                aria-expanded={showImage}
+                aria-controls="case-context-body"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d={showImage ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" : "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"}
-                  />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-300/70">
+                    Case context
+                  </p>
+                  <p className="text-sm text-slate-200 truncate">
+                    {caseData.diagnosisTitle || caseData.title}
+                  </p>
+                </div>
+                <svg
+                  className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${showImage ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-                {showImage ? "Hide Image" : "Show Image"}
               </button>
-            )}
-
-            {showImage && hasImage && (
-              <div className="mb-6">{renderClinicalImage("max-w-md", { layoutId: "clinical-image" })}</div>
-            )}
+              <AnimatePresence initial={false}>
+                {showImage && (
+                  <motion.div
+                    id="case-context-body"
+                    initial={reduce ? false : { opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25, ease: easeOut }}
+                    className="overflow-hidden border-t border-slate-700/40"
+                  >
+                    <div className="px-4 py-3 space-y-3">
+                      {caseData.presentation && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 mb-1">
+                            Presentation
+                          </p>
+                          <p className="text-sm text-slate-300 leading-relaxed">{caseData.presentation}</p>
+                        </div>
+                      )}
+                      {caseData.photoDescription && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 mb-1">
+                            Photo findings
+                          </p>
+                          <p className="text-sm text-slate-300 leading-relaxed">{caseData.photoDescription}</p>
+                        </div>
+                      )}
+                      {hasImage && (
+                        <div>{renderClinicalImage("max-w-md", { layoutId: "clinical-image" })}</div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             <AnimatePresence mode="wait">
               <motion.div
@@ -746,7 +861,18 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                 </div>
 
                 {!showAnswer ? (
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={handlePreviousQuestion}
+                      className="py-3 px-4 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-300 font-medium transition-colors flex items-center gap-2"
+                      title={currentQuestion === 0 ? "Back to image" : "Previous question (no progress lost)"}
+                      aria-label="Go to previous question"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      <span className="text-sm">{currentQuestion === 0 ? "Image" : "Back"}</span>
+                    </button>
                     <motion.button
                       onClick={handleSubmitAnswer}
                       disabled={!userAnswers[currentQuestion].trim() || submitting}
@@ -944,18 +1070,31 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
                       </div>
                     )}
 
-                    <motion.button
-                      onClick={handleNextQuestion}
-                      whileHover={reduce ? undefined : { scale: 1.01 }}
-                      whileTap={reduce ? undefined : { scale: 0.99 }}
-                      className="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
-                    >
-                      {submitting
-                        ? "Scoring..."
-                        : currentQuestion < caseData.questions.length - 1
-                        ? "Next Question"
-                        : "See Results"}
-                    </motion.button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handlePreviousQuestion}
+                        className="py-3 px-4 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-300 font-medium transition-colors flex items-center gap-2"
+                        title={currentQuestion === 0 ? "Back to image" : "Previous question (no progress lost)"}
+                        aria-label="Go to previous question"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        <span className="text-sm">{currentQuestion === 0 ? "Image" : "Back"}</span>
+                      </button>
+                      <motion.button
+                        onClick={handleNextQuestion}
+                        whileHover={reduce ? undefined : { scale: 1.01 }}
+                        whileTap={reduce ? undefined : { scale: 0.99 }}
+                        className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+                      >
+                        {submitting
+                          ? "Scoring..."
+                          : currentQuestion < caseData.questions.length - 1
+                          ? "Next Question"
+                          : "See Results"}
+                      </motion.button>
+                    </div>
                   </motion.div>
                 )}
               </motion.div>

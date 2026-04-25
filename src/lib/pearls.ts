@@ -537,29 +537,199 @@ export const ADVANCED_STRATEGY_PEARLS: TeachingPearl[] = [
   },
 ];
 
-export function getPearlsForCase(subspecialty: string, title: string): TeachingPearl[] {
-  const pearls: TeachingPearl[] = [];
+// ---------------------------------------------------------------------------
+// Pearls retrieval — TF/IDF inverted index over the curated pearl pool
+// ---------------------------------------------------------------------------
+//
+// Old version was naive: filter subspecialty pearls by literal title-word
+// substring match, then random-pick a strategy + advanced pearl. Result:
+// most cases got irrelevant general pearls because medical synonyms /
+// abbreviations meant the title words rarely matched verbatim.
+//
+// New version:
+//   1) ALWAYS surface the case's hand-curated `casePearls` first if any
+//      (those are highest-quality, perfectly relevant by construction).
+//   2) TF/IDF retrieval over ALL subspecialty pearls — score every pearl
+//      against a context vector built from (diagnosisTitle + title +
+//      presentation + photoDescription). Same-subspecialty matches get
+//      a 1.5× boost.
+//   3) If nothing scores above the relevance threshold, fall back to the
+//      subspecialty's first 2 general pearls (warns the user via tag).
+//   4) Add ONE strategy pearl picked deterministically by the case's
+//      subspecialty (NOT random) so users see different strategy advice
+//      per case but the same advice on revisits — better for spaced repetition.
 
-  // Add relevant subspecialty pearls based on title keyword matching
-  const specPearls = SUBSPECIALTY_PEARLS[subspecialty] || [];
-  pearls.push(...specPearls.filter(p => {
-    const titleLower = title.toLowerCase();
-    const pearlLower = p.pearl.toLowerCase();
-    const titleWords = titleLower.split(/\s+/).filter(w => w.length > 3);
-    return titleWords.some(w => pearlLower.includes(w));
-  }));
+const STOP_WORDS = new Set([
+  'the','and','with','this','that','from','have','has','for','his','her',
+  'are','was','were','will','would','could','should','also','some','one',
+  'two','three','four','five','any','all','can','may','might','show',
+  'shows','showing','seen','image','photo','left','right','side','area',
+  'use','used','using','include','includes','including','such','then',
+  'than','when','what','which','where','who','how','why','make','makes',
+  'made','being','been','your','their','our','out','off','over','under',
+  'into','onto','upon','about','above','below','before','after','during',
+  'while','since','until','through','between','within','without','because',
+  'patient','patients','case','cases','clinical','consider','due',
+]);
 
-  // If no specific match, include first 2 general pearls for the subspecialty
-  if (pearls.length === 0 && specPearls.length > 0) {
-    pearls.push(specPearls[0], specPearls[Math.min(1, specPearls.length - 1)]);
+interface IndexedPearl { pearl: TeachingPearl; subspecialty?: string; tokens: Set<string> }
+
+function tokenize(text: string): string[] {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s\-/]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+}
+
+// Build the index lazily on first access so module load stays cheap.
+let _indexed: IndexedPearl[] | null = null;
+let _docFreq: Record<string, number> | null = null;
+
+function buildIndex() {
+  const all: IndexedPearl[] = [];
+  for (const [subsp, list] of Object.entries(SUBSPECIALTY_PEARLS)) {
+    for (const p of list) {
+      const text = `${p.category} ${p.pearl} ${p.examTip || ''}`;
+      all.push({ pearl: p, subspecialty: subsp, tokens: new Set(tokenize(text)) });
+    }
+  }
+  for (const p of EXAM_STRATEGY_PEARLS) {
+    const text = `${p.category} ${p.pearl} ${p.examTip || ''}`;
+    all.push({ pearl: p, tokens: new Set(tokenize(text)) });
+  }
+  for (const p of ADVANCED_STRATEGY_PEARLS) {
+    const text = `${p.category} ${p.pearl} ${p.examTip || ''}`;
+    all.push({ pearl: p, tokens: new Set(tokenize(text)) });
+  }
+  const df: Record<string, number> = {};
+  for (const ip of all) for (const t of ip.tokens) df[t] = (df[t] || 0) + 1;
+  _indexed = all;
+  _docFreq = df;
+}
+
+function idf(token: string): number {
+  if (!_docFreq) return 0;
+  const df = _docFreq[token] || 0;
+  if (df === 0) return 0;
+  // BM25-style IDF — common words contribute very little.
+  const N = (_indexed || []).length || 1;
+  return Math.log(1 + (N - df + 0.5) / (df + 0.5));
+}
+
+function scorePearl(queryTokens: string[], ip: IndexedPearl, subsp?: string): number {
+  let score = 0;
+  for (const t of queryTokens) {
+    if (ip.tokens.has(t)) {
+      const w = idf(t);
+      // Title/category-position bonus — pearls whose category names a
+      // disease that matches the query are much more relevant.
+      const catBonus = ip.pearl.category.toLowerCase().includes(t) ? 0.6 : 0;
+      score += w + catBonus;
+    }
+  }
+  // Same-subspecialty match boost.
+  if (subsp && ip.subspecialty === subsp) score *= 1.5;
+  return score;
+}
+
+interface CaseContext {
+  subspecialty?: string;
+  title?: string;
+  diagnosisTitle?: string;
+  presentation?: string;
+  photoDescription?: string;
+  casePearls?: string[] | null;
+}
+
+/**
+ * Smart per-case pearls retrieval. Accepts either the legacy two-string
+ * signature (subspecialty, title) for backwards compat, or a richer
+ * CaseContext object that uses diagnosis + presentation + photo
+ * description for better relevance.
+ *
+ * Returns up to `maxPearls` pearls, ordered by relevance, with the
+ * hand-curated `casePearls` (if any) always at the top.
+ */
+export function getPearlsForCase(
+  subspecialtyOrCase: string | CaseContext,
+  title?: string,
+  maxPearls = 6
+): TeachingPearl[] {
+  if (!_indexed) buildIndex();
+
+  // Normalize input — caller may pass (subspecialty, title) or a
+  // CaseContext-shaped object. Read every available text field for
+  // the query so retrieval has the best signal.
+  const ctx: CaseContext = typeof subspecialtyOrCase === 'string'
+    ? { subspecialty: subspecialtyOrCase, title }
+    : subspecialtyOrCase;
+
+  const queryText = [
+    ctx.diagnosisTitle, ctx.title, ctx.presentation, ctx.photoDescription,
+    ...(ctx.casePearls || []),
+  ].filter(Boolean).join(' ');
+  const queryTokens = Array.from(new Set(tokenize(queryText)));
+
+  const out: TeachingPearl[] = [];
+  const seen = new Set<string>();
+
+  // 1. Always surface hand-curated case pearls first — perfect relevance
+  //    by construction. Wrap them in TeachingPearl shape so downstream
+  //    rendering is uniform.
+  for (const txt of ctx.casePearls || []) {
+    if (typeof txt === 'string' && txt.trim() && !seen.has(txt)) {
+      out.push({ category: 'Case-specific Pearl', pearl: txt.trim() });
+      seen.add(txt);
+    }
   }
 
-  // Include one general strategy pearl and one advanced pearl
-  const strategyPearl = EXAM_STRATEGY_PEARLS[Math.floor(Math.random() * EXAM_STRATEGY_PEARLS.length)];
-  const advancedPearl = ADVANCED_STRATEGY_PEARLS[Math.floor(Math.random() * ADVANCED_STRATEGY_PEARLS.length)];
-  pearls.push(strategyPearl, advancedPearl);
+  // 2. TF/IDF retrieval over the indexed pearl pool
+  if (queryTokens.length > 0 && _indexed) {
+    const scored = _indexed
+      .map(ip => ({ ip, score: scorePearl(queryTokens, ip, ctx.subspecialty) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score);
 
-  return pearls;
+    // Use a relative threshold — a pearl must be at least 35% as
+    // relevant as the top hit to be included. Prevents diluting the
+    // list with marginally-related pearls.
+    const topScore = scored[0]?.score || 0;
+    const cutoff = Math.max(0.6, topScore * 0.35);
+
+    for (const { ip } of scored) {
+      if (out.length >= maxPearls) break;
+      if (seen.has(ip.pearl.pearl)) continue;
+      if (scorePearl(queryTokens, ip, ctx.subspecialty) < cutoff) break;
+      out.push(ip.pearl);
+      seen.add(ip.pearl.pearl);
+    }
+  }
+
+  // 3. Fallback — if retrieval found nothing useful, surface the
+  //    first 2 pearls from the matching subspecialty.
+  if (out.length < 2 && ctx.subspecialty) {
+    const specPearls = SUBSPECIALTY_PEARLS[ctx.subspecialty] || [];
+    for (const p of specPearls.slice(0, 2)) {
+      if (out.length >= maxPearls) break;
+      if (seen.has(p.pearl)) continue;
+      out.push(p);
+      seen.add(p.pearl);
+    }
+  }
+
+  // 4. Add ONE strategy pearl chosen deterministically from the case
+  //    title hash so it's stable across revisits (good for spaced
+  //    repetition) — not random.
+  if (out.length < maxPearls && EXAM_STRATEGY_PEARLS.length > 0) {
+    const seed = (ctx.title || ctx.diagnosisTitle || ctx.subspecialty || 'x')
+      .split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0);
+    const idx = Math.abs(seed) % EXAM_STRATEGY_PEARLS.length;
+    const strat = EXAM_STRATEGY_PEARLS[idx];
+    if (!seen.has(strat.pearl)) out.push(strat);
+  }
+
+  return out.slice(0, maxPearls);
 }
 
 // ABO 8-ELEMENT PMP FRAMEWORK
