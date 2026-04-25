@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         // First-load sync: pull cloud history if signed in.
         if (data.session?.user) {
-          import("./supabase/sync").then((m) => void m.pullAndMergeAttempts());
+          import("./supabase/sync").then((m) => void m.pullEverything());
         }
       });
       const { data: sub } = sb.auth.onAuthStateChange((event, s) => {
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Pull-and-merge on every sign-in event so signing in on a new
         // device gives the user their progress immediately.
         if (event === "SIGNED_IN" && s?.user) {
-          import("./supabase/sync").then((m) => void m.pullAndMergeAttempts());
+          import("./supabase/sync").then((m) => void m.pullEverything());
         }
       });
       return () => {

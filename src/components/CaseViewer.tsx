@@ -17,7 +17,7 @@ import {
   getGradeBgColor,
 } from "@/lib/scoring";
 import { saveAttempt, toggleBookmark, isBookmarked, getAttemptsForCase, updateStudyStreak } from "@/lib/storage";
-import { pushAttemptToCloud } from "@/lib/supabase/sync";
+import { pushAttemptToCloud, pushBookmarkToggle, pushStreakToCloud } from "@/lib/supabase/sync";
 import { getPearlsForCase, QUESTION_TYPE_INFO, getQuestionInfo } from "@/lib/pearls";
 import AIPearlsCard from "./AIPearlsCard";
 import { getFatalFlawsForCase } from "@/lib/fatal-flaws";
@@ -75,14 +75,51 @@ function QuestionProgress({ total, current, showAnswer }: { total: number; curre
   );
 }
 
+// Auto-save key — keyed by case id so each case gets its own draft
+// without colliding. Drafts live in localStorage and are restored on
+// reopen so an accidental tab-close doesn't lose progress.
+const draftKey = (caseId: string) => `cvb.case.draft.v1.${caseId}`;
+
+interface CaseDraft {
+  photoAnswer?: string;
+  userAnswers?: string[];
+  currentQuestion?: number;
+  savedAt: string;
+}
+
+function loadDraft(caseId: string): CaseDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(draftKey(caseId));
+    if (!raw) return null;
+    return JSON.parse(raw) as CaseDraft;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft(caseId: string) {
+  if (typeof window === "undefined") return;
+  try { localStorage.removeItem(draftKey(caseId)); } catch { /* ignore */ }
+}
+
 export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   const reduce = useReducedMotion() ?? false;
+  // Try to rehydrate any in-progress draft for this case so an accidental
+  // tab-close / reload doesn't wipe what the candidate typed.
+  const draft = useMemo(() => loadDraft(caseData.id), [caseData.id]);
   const [phase, setPhase] = useState<Phase>("intro");
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<string[]>(
-    new Array(caseData.questions.length).fill("")
-  );
-  const [photoAnswer, setPhotoAnswer] = useState("");
+  const [currentQuestion, setCurrentQuestion] = useState(draft?.currentQuestion ?? 0);
+  const [userAnswers, setUserAnswers] = useState<string[]>(() => {
+    const blank = new Array(caseData.questions.length).fill("");
+    if (draft?.userAnswers && Array.isArray(draft.userAnswers)) {
+      // Pad/truncate to match the current case length (defensive against
+      // schema drift between when the draft was saved and now).
+      for (let i = 0; i < blank.length; i++) blank[i] = draft.userAnswers[i] || "";
+    }
+    return blank;
+  });
+  const [photoAnswer, setPhotoAnswer] = useState(draft?.photoAnswer || "");
   const [scoredAnswers, setScoredAnswers] = useState<UserAnswer[]>([]);
   const [photoScore, setPhotoScore] = useState<{
     score: number;
@@ -140,6 +177,39 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
   useEffect(() => {
     if (textareaRef.current) textareaRef.current.focus();
   }, [phase, currentQuestion]);
+
+  // Autosave draft to localStorage as the user types. Throttled — saves
+  // 350ms after the last keystroke. Skipped while showing the model
+  // answer (no point auto-saving a completed question's text).
+  useEffect(() => {
+    if (phase === "results" || phase === "intro") return;
+    const t = setTimeout(() => {
+      const draft: CaseDraft = {
+        photoAnswer,
+        userAnswers,
+        currentQuestion,
+        savedAt: new Date().toISOString(),
+      };
+      try {
+        localStorage.setItem(draftKey(caseData.id), JSON.stringify(draft));
+      } catch { /* quota exceeded — ignore */ }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [photoAnswer, userAnswers, currentQuestion, phase, caseData.id]);
+
+  // Clear draft once the case is finished (results phase = case complete).
+  useEffect(() => {
+    if (phase === "results") clearDraft(caseData.id);
+  }, [phase, caseData.id]);
+
+  // Show a one-time toast when we restored a draft so the user knows
+  // their previous progress was loaded back in.
+  const [showRestoredHint, setShowRestoredHint] = useState(!!draft);
+  useEffect(() => {
+    if (!showRestoredHint) return;
+    const t = setTimeout(() => setShowRestoredHint(false), 4000);
+    return () => clearTimeout(t);
+  }, [showRestoredHint]);
 
   const hasImage = !!(caseData.imageFile || caseData.externalImageUrl);
   const hasPhotoDescription = !!(caseData.photoDescription && caseData.photoDescription.trim());
@@ -213,6 +283,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
         // Fire-and-forget cloud sync. No-op when not signed in.
         void pushAttemptToCloud(attempt);
         updateStudyStreak();
+        void pushStreakToCloud();
         setPhase("results");
         setSubmitting(false);
       }, reduce ? 0 : 450);
@@ -223,6 +294,7 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
     const newState = toggleBookmark(caseData.id);
     setBookmarked(newState);
     setBookmarkPulse((n) => n + 1);
+    void pushBookmarkToggle(caseData.id, newState);
   };
 
   const formatTime = (seconds: number): string => {
@@ -379,6 +451,33 @@ export default function CaseViewer({ caseData, onBack }: CaseViewerProps) {
           animate="show"
           variants={staggerMed}
         >
+          {showRestoredHint && draft && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+            >
+              <span>
+                <span className="font-semibold">Draft restored.</span> Picked up where you left off
+                {draft.savedAt
+                  ? ` (saved ${new Date(draft.savedAt).toLocaleString()})`
+                  : ""}.
+              </span>
+              <button
+                onClick={() => {
+                  clearDraft(caseData.id);
+                  setUserAnswers(new Array(caseData.questions.length).fill(""));
+                  setPhotoAnswer("");
+                  setCurrentQuestion(0);
+                  setShowRestoredHint(false);
+                }}
+                className="text-xs underline text-amber-200 hover:text-white"
+              >
+                Start fresh
+              </button>
+            </motion.div>
+          )}
           <div className="glass-card rounded-2xl p-8">
             {/* Subspecialty ribbon — drops in from top */}
             <motion.div

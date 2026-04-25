@@ -192,3 +192,143 @@ export function saveAttemptWithSync(attempt: CaseAttempt): void {
   saveAttempt(attempt);
   void pushAttemptToCloud(attempt);
 }
+
+// ---------------------------------------------------------------------------
+// Bookmarks sync — same fire-and-forget pattern as attempts
+// ---------------------------------------------------------------------------
+
+const BOOKMARKS_KEY = "ophtho_boards_bookmarks";
+
+/** Push the FULL bookmarks set to Supabase (idempotent upsert). Cheaper
+ *  than diffing because the table is tiny (one row per bookmarked case). */
+export async function syncBookmarksToCloud(): Promise<void> {
+  if (!isSupabaseEnabled()) return;
+  const sb = supabase();
+  if (!sb) return;
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const userId = sess?.session?.user?.id;
+    if (!userId) return;
+    const raw = localStorage.getItem(BOOKMARKS_KEY);
+    const local: string[] = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(local)) return;
+
+    // Pull cloud bookmarks
+    const { data: cloudData } = await sb.from("bookmarks").select("case_id").eq("user_id", userId);
+    const cloudIds = new Set((cloudData || []).map((r) => r.case_id));
+    const localIds = new Set(local);
+
+    // Add bookmarks that exist locally but not in cloud
+    const toAdd = local.filter((id) => !cloudIds.has(id));
+    if (toAdd.length > 0) {
+      await sb.from("bookmarks").insert(toAdd.map((case_id) => ({ user_id: userId, case_id })));
+    }
+
+    // Add bookmarks that exist in cloud but not locally (cross-device merge)
+    const toRestore = Array.from(cloudIds).filter((id) => !localIds.has(id));
+    if (toRestore.length > 0) {
+      const merged = [...local, ...toRestore];
+      safeSetItem(BOOKMARKS_KEY, JSON.stringify(merged));
+    }
+  } catch (e) {
+    console.warn("[sync] bookmarks sync failed:", (e as Error).message);
+  }
+}
+
+/** Toggle a bookmark in the cloud. Called after the local toggle so the
+ *  UI feels instant. */
+export async function pushBookmarkToggle(caseId: string, bookmarked: boolean): Promise<void> {
+  if (!isSupabaseEnabled()) return;
+  const sb = supabase();
+  if (!sb) return;
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const userId = sess?.session?.user?.id;
+    if (!userId) return;
+    if (bookmarked) {
+      await sb.from("bookmarks").upsert({ user_id: userId, case_id: caseId }, { onConflict: "user_id,case_id" });
+    } else {
+      await sb.from("bookmarks").delete().eq("user_id", userId).eq("case_id", caseId);
+    }
+  } catch (e) {
+    console.warn("[sync] bookmark push failed:", (e as Error).message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Streaks sync — pull cloud streak on sign-in, push on every update
+// ---------------------------------------------------------------------------
+
+const STREAK_KEY = "ophtho_boards_streak";
+
+interface StreakState { current: number; lastDate: string }
+
+export async function pushStreakToCloud(): Promise<void> {
+  if (!isSupabaseEnabled()) return;
+  const sb = supabase();
+  if (!sb) return;
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const userId = sess?.session?.user?.id;
+    if (!userId) return;
+    const raw = localStorage.getItem(STREAK_KEY);
+    if (!raw) return;
+    const local: StreakState = JSON.parse(raw);
+    if (!local || typeof local.current !== "number") return;
+    await sb.from("streaks").upsert(
+      {
+        user_id: userId,
+        current_streak: local.current,
+        last_attempt_date: local.lastDate,
+      },
+      { onConflict: "user_id" }
+    );
+  } catch (e) {
+    console.warn("[sync] streak push failed:", (e as Error).message);
+  }
+}
+
+export async function pullStreakFromCloud(): Promise<void> {
+  if (!isSupabaseEnabled()) return;
+  const sb = supabase();
+  if (!sb) return;
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const userId = sess?.session?.user?.id;
+    if (!userId) return;
+    const { data, error } = await sb
+      .from("streaks")
+      .select("current_streak, last_attempt_date")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !data) return;
+    const raw = localStorage.getItem(STREAK_KEY);
+    const local: StreakState = raw ? JSON.parse(raw) : { current: 0, lastDate: "" };
+    // Cloud-wins ONLY if cloud has more recent activity. Otherwise local
+    // (the more-recent device) wins and gets pushed back up next save.
+    const cloudIsNewer =
+      !local.lastDate ||
+      (data.last_attempt_date && new Date(data.last_attempt_date) > new Date(local.lastDate));
+    if (cloudIsNewer) {
+      const merged = {
+        current: Math.max(local.current, data.current_streak),
+        lastDate: data.last_attempt_date || local.lastDate,
+      };
+      safeSetItem(STREAK_KEY, JSON.stringify(merged));
+    } else {
+      // Push local up
+      void pushStreakToCloud();
+    }
+  } catch (e) {
+    console.warn("[sync] streak pull failed:", (e as Error).message);
+  }
+}
+
+/** One-stop "I just signed in — sync everything" helper. */
+export async function pullEverything(): Promise<void> {
+  await Promise.allSettled([
+    pullAndMergeAttempts(),
+    syncBookmarksToCloud(),
+    pullStreakFromCloud(),
+  ]);
+}
