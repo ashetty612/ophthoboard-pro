@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { GraduationCap } from "lucide-react";
 import { fadeUp, stagger, hoverPress, pulseBadge } from "@/lib/motion";
 import SpotlightCursor from "./SpotlightCursor";
 import CountUp from "./CountUp";
@@ -169,9 +170,7 @@ export default function Hero({ stats, onStartRandom, onOpenAI, daysUntilExam }: 
             className="inline-flex items-center gap-2 rounded-full border border-steel-500/40 bg-steel-500/5 px-7 py-3.5 font-semibold text-steel-200 transition-colors hover:bg-steel-500/15 hover:text-white"
           >
             <span>Meet the AI examiner</span>
-            <span className="text-xs" aria-hidden>
-              🎓
-            </span>
+            <GraduationCap className="h-4 w-4 text-steel-200" strokeWidth={2} aria-hidden />
           </motion.button>
         </motion.div>
 

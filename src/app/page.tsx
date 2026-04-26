@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { CasesDatabase, CaseData, Subspecialty } from "@/lib/types";
 import { getProgress, getBookmarks, getStudyStreak } from "@/lib/storage";
 import CaseViewer from "@/components/CaseViewer";
@@ -38,6 +38,26 @@ import HomeSkeleton from "@/components/HomeSkeleton";
 import CommandPalette from "@/components/CommandPalette";
 import StudyModeCard, { type StudyModeSize } from "@/components/StudyModeCard";
 import FeatureMarquee from "@/components/FeatureMarquee";
+import SubspecialtyIcon from "@/components/SubspecialtyIcon";
+import {
+  Landmark,
+  Sparkles,
+  FileText,
+  CalendarClock,
+  LayoutGrid,
+  Target,
+  Zap,
+  BrainCircuit,
+  Layers,
+  Timer,
+  Shuffle,
+  BookOpen,
+  ListChecks,
+  BookMarked,
+  TrendingUp,
+  Settings2,
+  Flame,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { staggerFast } from "@/lib/motion";
 import { computeHeatmap, axisLabel, type HeatmapCell } from "@/lib/heatmap";
@@ -439,12 +459,13 @@ export default function Home() {
     0
   );
 
-  const subspecialtyMeta: { [key: string]: { icon: string; color: string; accent: string } } = {
-    "anterior-segment": { icon: "🔬", color: "from-cyan-500 to-blue-600", accent: "border-l-cyan-500" },
-    "posterior-segment": { icon: "👁️", color: "from-violet-500 to-purple-600", accent: "border-l-violet-500" },
-    "neuro-ophthalmology-and-orbit": { icon: "🧠", color: "from-amber-500 to-orange-600", accent: "border-l-amber-500" },
-    "pediatric-ophthalmology": { icon: "👶", color: "from-emerald-500 to-teal-600", accent: "border-l-emerald-500" },
-    optics: { icon: "🔍", color: "from-rose-500 to-pink-600", accent: "border-l-rose-500" },
+  const subspecialtyMeta: { [key: string]: { color: string; accent: string } } = {
+    "anterior-segment": { color: "from-cyan-500 to-blue-600", accent: "border-l-cyan-500" },
+    "posterior-segment": { color: "from-violet-500 to-purple-600", accent: "border-l-violet-500" },
+    "neuro-ophthalmology-and-orbit": { color: "from-amber-500 to-orange-600", accent: "border-l-amber-500" },
+    "neuro-ophthalmology": { color: "from-amber-500 to-orange-600", accent: "border-l-amber-500" },
+    "pediatric-ophthalmology": { color: "from-emerald-500 to-teal-600", accent: "border-l-emerald-500" },
+    optics: { color: "from-rose-500 to-pink-600", accent: "border-l-rose-500" },
   };
 
   const completionPct = totalActiveCases > 0 ? Math.round((progress.totalCasesAttempted / totalActiveCases) * 100) : 0;
@@ -524,7 +545,9 @@ export default function Home() {
           <div className="mb-6 rounded-xl border border-rose-500/40 bg-gradient-to-r from-rose-500/15 to-amber-500/10 p-4 animate-fade-in-up" role="status">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="text-2xl" aria-hidden>🔥</span>
+                <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-rose-500 to-amber-500 shadow-lg ring-1 ring-rose-300/30">
+                  <Flame className="h-5 w-5 text-white drop-shadow" strokeWidth={2} />
+                </span>
                 <div>
                   <p className="text-sm font-bold text-rose-200 uppercase tracking-wider">Exam-Week Mode Active</p>
                   <p className="text-xs text-slate-300 mt-0.5">
@@ -702,7 +725,9 @@ export default function Home() {
         {!isFirstTime && weakestHint && weakestCase && !searchQuery && (
           <div className="mb-10 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-rose-500/5 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-up">
             <div className="flex items-start gap-3">
-              <span className="text-2xl mt-0.5" aria-hidden>🎯</span>
+              <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 shadow-lg ring-1 ring-amber-300/30">
+                <Target className="h-5 w-5 text-white drop-shadow" strokeWidth={2} />
+              </span>
               <div>
                 <p className="text-[11px] text-amber-300 uppercase tracking-wider font-semibold">Today&apos;s Focus</p>
                 <p className="text-sm text-white font-medium mt-0.5">
@@ -727,7 +752,9 @@ export default function Home() {
             aria-label="Open Performance Heatmap"
           >
             <div className="flex items-start gap-3">
-              <span className="text-2xl mt-0.5" aria-hidden>📊</span>
+              <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary-500 to-steel-500 shadow-lg ring-1 ring-primary-300/30">
+                <LayoutGrid className="h-5 w-5 text-white drop-shadow" strokeWidth={2} />
+              </span>
               <div>
                 <p className="text-[11px] text-primary-300 uppercase tracking-wider font-semibold">Performance Heatmap</p>
                 <p className="text-sm text-white font-medium mt-0.5">
@@ -808,7 +835,7 @@ export default function Home() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-14" data-tour="subspecialties">
               {database.subspecialties.map((spec, i) => {
                 const activeCases = spec.cases.filter((c) => c.questions.length > 0).length;
-                const meta = subspecialtyMeta[spec.id] || { icon: "📚", color: "from-slate-500 to-slate-700", accent: "border-l-slate-500" };
+                const meta = subspecialtyMeta[spec.id] || { color: "from-slate-500 to-slate-700", accent: "border-l-slate-500" };
                 const specProgress = progress.bySubspecialty[spec.name];
                 const pct = specProgress ? Math.round((specProgress.attempted / activeCases) * 100) : 0;
                 return (
@@ -819,9 +846,11 @@ export default function Home() {
                     style={{ animationDelay: `${i * 80}ms` }}
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <div className={`w-11 h-11 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-xl shadow-lg`}>
-                        {meta.icon}
-                      </div>
+                      <SubspecialtyIcon
+                        id={spec.id}
+                        gradient={meta.color}
+                        className="w-11 h-11 rounded-lg"
+                      />
                       <span className="text-[10px] text-slate-500 bg-slate-800/80 px-2 py-0.5 rounded-full font-medium">
                         {activeCases} cases
                       </span>
@@ -870,14 +899,17 @@ export default function Home() {
                 aria-pressed={examWeekMode}
                 aria-label="Toggle Exam-Week Mode"
               >
-                {examWeekMode ? "🔥 Exam-Week Mode ON" : "Exam-Week Mode"}
+                <span className="inline-flex items-center gap-1.5">
+                  {examWeekMode && <Flame className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />}
+                  {examWeekMode ? "Exam-Week Mode ON" : "Exam-Week Mode"}
+                </span>
               </button>
             </div>
             {(() => {
               type Mode = {
                 label: string;
                 desc: string;
-                icon: string;
+                icon: ReactNode;
                 gradient: string;
                 size: StudyModeSize;
                 badge?: "new" | "popular" | "hot";
@@ -891,7 +923,7 @@ export default function Home() {
                 {
                   label: "Paired-Topic Mock Exam",
                   desc: "Authentic ABO room format — 2 examiners, 14 cases, 50 min. The closest thing to the real deal.",
-                  icon: "🏛️",
+                  icon: <Landmark strokeWidth={1.75} />,
                   gradient: "from-primary-500 to-emerald-600",
                   size: "xl",
                   badge: "popular",
@@ -902,7 +934,7 @@ export default function Home() {
                 {
                   label: "AI Examiner",
                   desc: "Real-time AI tutor & mock examiner. 10 modes, Gemini-powered.",
-                  icon: "🤖",
+                  icon: <Sparkles strokeWidth={1.75} />,
                   gradient: "from-steel-400 to-primary-500",
                   size: "lg",
                   badge: "hot",
@@ -914,7 +946,7 @@ export default function Home() {
                 {
                   label: "Cram Sheet",
                   desc: "Printable high-yield reference across all subspecialties.",
-                  icon: "📝",
+                  icon: <FileText strokeWidth={1.75} />,
                   gradient: "from-amber-400 to-amber-600",
                   size: "md",
                   action: () => setCurrentView("cram"),
@@ -928,7 +960,7 @@ export default function Home() {
                     : progress.totalCasesAttempted === 0
                     ? "Study a case to build your review queue."
                     : "All caught up — come back tomorrow.",
-                  icon: "📅",
+                  icon: <CalendarClock strokeWidth={1.75} />,
                   gradient: overdueCount > 0 ? "from-rose-500 to-amber-500" : "from-primary-500 to-steel-500",
                   size: "md",
                   action: () => setCurrentView("due-today"),
@@ -940,7 +972,7 @@ export default function Home() {
                   desc: heatmapWeakestCell
                     ? `Weakest: ${axisLabel(heatmapWeakestCell.axis)} in ${heatmapWeakestCell.subspecialty} — ${heatmapWeakestCell.averagePercent}%`
                     : "Subspecialty × ABO-axis breakdown.",
-                  icon: "📊",
+                  icon: <LayoutGrid strokeWidth={1.75} />,
                   gradient: "from-primary-500 to-steel-400",
                   size: "md",
                   badge: "new",
@@ -954,7 +986,7 @@ export default function Home() {
                     : progress.totalCasesAttempted === 0
                     ? "Complete cases to unlock weakness targeting."
                     : "Target your lowest-scoring areas.",
-                  icon: "🎯",
+                  icon: <Target strokeWidth={1.75} />,
                   gradient: "from-steel-500 to-primary-600",
                   size: "md",
                   action: () => setCurrentView("weakness-quiz"),
@@ -963,7 +995,7 @@ export default function Home() {
                 {
                   label: "Rapid-Fire Drill",
                   desc: "30s per question — exam pressure simulator.",
-                  icon: "⚡",
+                  icon: <Zap strokeWidth={1.75} />,
                   gradient: "from-rose-500 to-amber-500",
                   size: "sm",
                   action: () => setCurrentView("rapid-fire"),
@@ -973,7 +1005,7 @@ export default function Home() {
                 {
                   label: "Q-Bank",
                   desc: "50 high-yield board-style questions & answers.",
-                  icon: "🧠",
+                  icon: <BrainCircuit strokeWidth={1.75} />,
                   gradient: "from-primary-400 to-steel-500",
                   size: "sm",
                   action: () => setCurrentView("qbank"),
@@ -982,7 +1014,7 @@ export default function Home() {
                 {
                   label: "My Flashcards",
                   desc: "Your custom cards — SRS-scheduled.",
-                  icon: "📇",
+                  icon: <Layers strokeWidth={1.75} />,
                   gradient: "from-steel-400 to-steel-600",
                   size: "sm",
                   action: () => setCurrentView("user-flashcards"),
@@ -991,7 +1023,7 @@ export default function Home() {
                 {
                   label: "Exam Simulation",
                   desc: "Timed mock exam with random cases.",
-                  icon: "⏱️",
+                  icon: <Timer strokeWidth={1.75} />,
                   gradient: "from-amber-500 to-rose-500",
                   size: "sm",
                   action: () => setCurrentView("exam"),
@@ -1001,7 +1033,7 @@ export default function Home() {
                 {
                   label: "Random Case",
                   desc: "Jump into a surprise case right now.",
-                  icon: "🎲",
+                  icon: <Shuffle strokeWidth={1.75} />,
                   gradient: "from-emerald-400 to-primary-500",
                   size: "sm",
                   action: () => {
@@ -1014,7 +1046,7 @@ export default function Home() {
                 {
                   label: "Flashcards",
                   desc: "Rapid concept review cards.",
-                  icon: "🃏",
+                  icon: <BookOpen strokeWidth={1.75} />,
                   gradient: "from-steel-500 to-primary-500",
                   size: "sm",
                   action: () => setCurrentView("flashcards"),
@@ -1023,7 +1055,7 @@ export default function Home() {
                 {
                   label: "Quick Review",
                   desc: "Browse answers without scoring.",
-                  icon: "📋",
+                  icon: <ListChecks strokeWidth={1.75} />,
                   gradient: "from-primary-500 to-emerald-500",
                   size: "sm",
                   action: () => setCurrentView("review"),
@@ -1032,7 +1064,7 @@ export default function Home() {
                 {
                   label: "Practice Patterns",
                   desc: "AAO PPP guidelines & quizzes.",
-                  icon: "📖",
+                  icon: <BookMarked strokeWidth={1.75} />,
                   gradient: "from-steel-400 to-primary-500",
                   size: "sm",
                   action: () => setCurrentView("ppp"),
@@ -1041,7 +1073,7 @@ export default function Home() {
                 {
                   label: "Analytics",
                   desc: "Performance analytics & insights.",
-                  icon: "📈",
+                  icon: <TrendingUp strokeWidth={1.75} />,
                   gradient: "from-primary-500 to-steel-600",
                   size: "sm",
                   action: () => setCurrentView("dashboard"),
@@ -1050,7 +1082,7 @@ export default function Home() {
                 {
                   label: "Settings / Data",
                   desc: "Export, import, or reset your progress.",
-                  icon: "⚙️",
+                  icon: <Settings2 strokeWidth={1.75} />,
                   gradient: "from-slate-500 to-slate-700",
                   size: "sm",
                   action: () => setCurrentView("settings"),

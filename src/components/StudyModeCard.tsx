@@ -111,7 +111,12 @@ export default function StudyModeCard({
           <div
             className={`relative flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} ${isFeature ? "h-14 w-14 text-3xl" : "h-11 w-11 text-xl"} shadow-[0_8px_24px_-10px_rgba(4,121,98,0.55)]`}
           >
-            <span className="drop-shadow-sm" aria-hidden>{icon}</span>
+            <span
+              className={`text-white drop-shadow-sm ${isFeature ? "[&>svg]:h-7 [&>svg]:w-7" : "[&>svg]:h-[22px] [&>svg]:w-[22px]"}`}
+              aria-hidden
+            >
+              {icon}
+            </span>
             <span
               aria-hidden
               className="absolute inset-0 rounded-xl bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"

@@ -1,7 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+  Home,
+  ListChecks,
+  Timer,
+  GraduationCap,
+  TrendingUp,
+  FileText,
+  CalendarClock,
+  Target,
+  BookOpen,
+  BookMarked,
+  Stethoscope,
+} from "lucide-react";
 import type { GlobalView } from "@/lib/use-global-keyboard";
 
 /**
@@ -36,7 +49,7 @@ interface NavCommand {
   hint: string;
   view: GlobalView;
   keywords: string;
-  icon: string;
+  icon: ReactNode;
 }
 
 interface CaseCommand {
@@ -46,22 +59,23 @@ interface CaseCommand {
   hint: string;
   caseId: string;
   keywords: string;
-  icon: string;
+  icon: ReactNode;
 }
 
 type Command = NavCommand | CaseCommand;
 
+const NAV_ICON = "h-4 w-4";
 const NAV_COMMANDS: NavCommand[] = [
-  { type: "nav", id: "nav-home", label: "Home", hint: "Hub + recommendations", view: "home", keywords: "home dashboard start landing", icon: "⌂" },
-  { type: "nav", id: "nav-review", label: "Review Cases", hint: "Browse + study answers", view: "review", keywords: "review study browse cases", icon: "📋" },
-  { type: "nav", id: "nav-exam", label: "Exam Mode", hint: "Timed mock exam", view: "exam", keywords: "exam test simulation timed", icon: "⏱" },
-  { type: "nav", id: "nav-ai", label: "AI Examiner", hint: "Lensley + Eyesaac chat", view: "ai-examiner", keywords: "ai examiner lensley eyesaac chat tutor", icon: "🎓" },
-  { type: "nav", id: "nav-dash", label: "Performance Dashboard", hint: "Stats + heatmap + recent", view: "dashboard", keywords: "dashboard progress stats analytics", icon: "📊" },
-  { type: "nav", id: "nav-cram", label: "Cram Sheet", hint: "High-yield reference", view: "cram", keywords: "cram sheet reference high-yield pearls", icon: "📝" },
-  { type: "nav", id: "nav-due", label: "Due Today", hint: "SRS-due cards", view: "due-today", keywords: "due today srs spaced repetition review", icon: "📅" },
-  { type: "nav", id: "nav-weak", label: "Weakness Drill", hint: "Cases on your weak areas", view: "weakness-quiz", keywords: "weakness drill weakest gaps", icon: "🎯" },
-  { type: "nav", id: "nav-flash", label: "Flashcards", hint: "SRS-style flashcards", view: "flashcards", keywords: "flashcards cards srs", icon: "🃏" },
-  { type: "nav", id: "nav-ppp", label: "AAO PPPs", hint: "Practice patterns reference", view: "ppp", keywords: "ppp aao practice patterns reference", icon: "📚" },
+  { type: "nav", id: "nav-home", label: "Home", hint: "Hub + recommendations", view: "home", keywords: "home dashboard start landing", icon: <Home className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-review", label: "Review Cases", hint: "Browse + study answers", view: "review", keywords: "review study browse cases", icon: <ListChecks className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-exam", label: "Exam Mode", hint: "Timed mock exam", view: "exam", keywords: "exam test simulation timed", icon: <Timer className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-ai", label: "AI Examiner", hint: "Lensley + Eyesaac chat", view: "ai-examiner", keywords: "ai examiner lensley eyesaac chat tutor", icon: <GraduationCap className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-dash", label: "Performance Dashboard", hint: "Stats + heatmap + recent", view: "dashboard", keywords: "dashboard progress stats analytics", icon: <TrendingUp className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-cram", label: "Cram Sheet", hint: "High-yield reference", view: "cram", keywords: "cram sheet reference high-yield pearls", icon: <FileText className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-due", label: "Due Today", hint: "SRS-due cards", view: "due-today", keywords: "due today srs spaced repetition review", icon: <CalendarClock className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-weak", label: "Weakness Drill", hint: "Cases on your weak areas", view: "weakness-quiz", keywords: "weakness drill weakest gaps", icon: <Target className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-flash", label: "Flashcards", hint: "SRS-style flashcards", view: "flashcards", keywords: "flashcards cards srs", icon: <BookOpen className={NAV_ICON} strokeWidth={2} /> },
+  { type: "nav", id: "nav-ppp", label: "AAO PPPs", hint: "Practice patterns reference", view: "ppp", keywords: "ppp aao practice patterns reference", icon: <BookMarked className={NAV_ICON} strokeWidth={2} /> },
 ];
 
 /**
@@ -106,7 +120,7 @@ export default function CommandPalette({ cases, onNavigate, onOpenCase }: Props)
         hint: c.subspecialty || "Case",
         caseId: c.id,
         keywords: `${c.title} ${c.subspecialty || ""} ${c.diagnosisTitle || ""}`,
-        icon: "🩺",
+        icon: <Stethoscope className={NAV_ICON} strokeWidth={2} />,
       })),
     [cases]
   );
@@ -256,7 +270,7 @@ export default function CommandPalette({ cases, onNavigate, onOpenCase }: Props)
                         active ? "bg-primary-500/15 text-white" : "text-slate-300 hover:bg-slate-800/50"
                       }`}
                     >
-                      <span className="text-base shrink-0" aria-hidden>{c.icon}</span>
+                      <span className={`shrink-0 ${active ? "text-primary-300" : "text-slate-400"}`} aria-hidden>{c.icon}</span>
                       <div className="min-w-0 flex-1">
                         <div className="text-sm truncate">{c.label}</div>
                         <div className="text-[11px] text-slate-500 truncate">
