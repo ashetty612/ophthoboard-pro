@@ -518,7 +518,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-10">
+      <main id="main-content" className="max-w-6xl mx-auto px-4 py-10">
         {/* Exam-Week Mode Banner */}
         {examWeekMode && (
           <div className="mb-6 rounded-xl border border-rose-500/40 bg-gradient-to-r from-rose-500/15 to-amber-500/10 p-4 animate-fade-in-up" role="status">
@@ -1172,7 +1172,10 @@ export default function Home() {
         onClick={() => setShowHelp(true)}
         aria-label="Show keyboard shortcuts"
         title="Keyboard shortcuts (?)"
-        className="fixed bottom-5 right-5 z-40 w-10 h-10 rounded-full glass-card border border-slate-700/60 flex items-center justify-center text-slate-300 opacity-50 hover:opacity-100 hover:text-white transition-opacity font-mono text-sm"
+        // Lifted above the iOS home-indicator via safe-area-inset.
+        // bottom-5 = 20px; we add the safe-area inset on top of that.
+        style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))" }}
+        className="fixed right-5 z-40 w-10 h-10 rounded-full glass-card border border-slate-700/60 flex items-center justify-center text-slate-300 opacity-50 hover:opacity-100 hover:text-white transition-opacity font-mono text-sm"
       >
         ?
       </button>

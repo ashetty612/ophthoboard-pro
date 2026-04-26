@@ -1683,7 +1683,15 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
                     {isPlaceholder ? (
                       <TypingIndicator />
                     ) : (
-                      <div className="text-sm leading-relaxed chat-markdown">
+                      <div
+                        className="text-sm leading-relaxed chat-markdown"
+                        // Announce the LAST assistant message to screen
+                        // readers as it streams. `polite` so it doesn't
+                        // interrupt the user; we don't aria-live every
+                        // bubble (would re-announce on history scroll).
+                        aria-live={isLastAi ? "polite" : undefined}
+                        aria-atomic={isLastAi ? "false" : undefined}
+                      >
                         {renderMarkdown(msg.content)}
                       </div>
                     )}
@@ -1812,7 +1820,7 @@ export default function AIExaminer({ database, onBack, initialCase }: AIExaminer
         </div>
       </div>
 
-      <div className="glass-card border-t border-slate-700/50">
+      <div className="glass-card border-t border-slate-700/50 safe-bottom">
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex gap-2 items-end">
             <div className="flex-1 relative">

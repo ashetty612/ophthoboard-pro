@@ -41,7 +41,17 @@ const fraunces = Fraunces({
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#020a13',
+  // viewportFit: 'cover' lets the page extend under the iPhone notch +
+  // home indicator. We then add safe-area-inset padding to fixed/sticky
+  // chrome (header + footer + nav) via CSS so nothing important is hidden.
+  viewportFit: 'cover',
+  // maximumScale removed — iOS Safari ignores it for accessibility, and
+  // forcing it would only hurt low-vision users with text zoom.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#020617' },
+    { media: '(prefers-color-scheme: dark)', color: '#020617' },
+  ],
+  colorScheme: 'dark',
 };
 
 export const metadata: Metadata = {
@@ -54,14 +64,28 @@ export const metadata: Metadata = {
     type: "website",
   },
   icons: {
+    // Inline SVG favicon (lightweight, scales perfectly).
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%23047962'/><stop offset='100%' stop-color='%23347896'/></linearGradient></defs><circle cx='50' cy='50' r='45' fill='url(%23g)'/><circle cx='50' cy='50' r='16' fill='%23020a13'/><circle cx='44' cy='44' r='5' fill='%23ffffff' opacity='0.7'/></svg>",
-    apple: "/mascots/cve-icon.png",
+    // Apple touch icon — 180×180 PNG with proper padding so iOS doesn't
+    // cut into the eye/cap when it applies its corner-radius mask.
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
+    // black-translucent lets the app draw under the status bar, paired
+    // with viewport-fit=cover + safe-area padding in CSS.
     statusBarStyle: "black-translucent",
     title: "CVB",
+  },
+  // Microsoft tile color (for Windows Start menu pin)
+  other: {
+    "msapplication-TileColor": "#020617",
+    "msapplication-TileImage": "/icon-192.png",
+    // Hint to iOS Safari that this isn't a phone-number-detectable page
+    "format-detection": "telephone=no",
   },
 };
 
@@ -73,6 +97,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${fraunces.variable}`}>
       <body className="antialiased">
+        {/* Skip-link — invisible until focused via Tab. Lets keyboard
+            and screen-reader users jump past the sticky header straight
+            to page content. WCAG 2.4.1. */}
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <AuroraBackground />
         <AuthProvider>
           <ErrorBoundary>

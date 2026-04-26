@@ -392,8 +392,11 @@ export default function CramSheet({ onBack }: CramSheetProps) {
           </div>
         </aside>
 
-        {/* Mobile TOC toggle */}
-        <div className="cram-no-print lg:hidden fixed bottom-4 right-4 z-40">
+        {/* Mobile TOC toggle — lifted above iOS home-indicator. */}
+        <div
+          className="cram-no-print lg:hidden fixed right-4 z-40"
+          style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+        >
           <button
             onClick={() => setTocOpen((v) => !v)}
             className="w-11 h-11 rounded-full bg-slate-800 border border-slate-700 text-white shadow-lg flex items-center justify-center"
@@ -405,7 +408,10 @@ export default function CramSheet({ onBack }: CramSheetProps) {
           </button>
         </div>
         {tocOpen && (
-          <div className="cram-no-print lg:hidden fixed bottom-20 right-4 z-40 glass-card rounded-xl p-3 w-60 shadow-xl">
+          <div
+            className="cram-no-print lg:hidden fixed right-4 z-40 glass-card rounded-xl p-3 w-60 shadow-xl"
+            style={{ bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}
+          >
             <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Jump to</p>
             <div className="flex flex-col gap-0.5 text-sm">
               {["presentations", "fatal", "killer", "trials", "pearls", "pharm"].map((id) => (

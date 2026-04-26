@@ -3,23 +3,31 @@
   "short_name": "CVB",
   "description": "ABO oral boards prep — 432 cases, AI examiner, 25 AAO PPPs, 46 trials, 27 fatal flaws.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#020a13",
-  "theme_color": "#020a13",
+  "background_color": "#020617",
+  "theme_color": "#020617",
   "icons": [
     {
-      "src": "/mascots/cve-icon.png",
-      "sizes": "340x360",
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mascots/cve-icon.png",
-      "sizes": "340x360",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "medical"]
+  "categories": ["education", "medical"],
+  "prefer_related_applications": false
 }

@@ -190,6 +190,113 @@ h1, h2, h3, h4, h5, h6 {
   background: rgba(8, 14, 28, 0.92);
 }
 
+/* ──────────────────────────────────────────────────────────────────
+ * iOS / mobile polish — applied globally so the app feels native
+ * inside Safari, in the iPhone home-screen PWA, and on Android.
+ * ────────────────────────────────────────────────────────────── */
+
+/* Tap-highlight: iOS Safari shows a translucent gray flash on every
+ * link/button tap. Looks janky in our dark theme — override globally
+ * with transparent. We keep deliberate `:active` styles on key buttons
+ * so touch feedback isn't lost. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smoother momentum scroll inside scroll containers (most iOS Safari
+ * versions enable this by default now, but harmless to declare). */
+html, body {
+  -webkit-overflow-scrolling: touch;
+  /* Prevent the rubber-band overscroll from showing the white page
+   * behind the dark theme — particularly on iOS PWA. */
+  background-color: #020617;
+  /* Avoid horizontal scroll on iOS when long words / wide content
+   * sneak in (common with our 6 KB of medical text). */
+  overscroll-behavior-x: contain;
+}
+
+/* iOS Safari zooms in on focus when a form input has font-size < 16px.
+ * We have many small captions/labels but the text-typing controls
+ * specifically must be ≥16px. Force it on every interactive input. */
+@media (max-width: 480px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
+}
+
+/* Safe-area padding for notched devices (iPhone X+ and friends).
+ * Anything sticky/fixed at top picks up the notch padding; anything
+ * sticky/fixed at bottom picks up the home-indicator padding.
+ * Combined with viewport-fit=cover in the meta viewport so the page
+ * extends edge-to-edge under the notch. */
+.glass-card.sticky.top-0 {
+  /* Re-declare the bg from above so the cascade preserves opacity */
+  background: rgba(8, 14, 28, 0.92);
+  /* Notch / dynamic-island clearance */
+  padding-top: env(safe-area-inset-top, 0px);
+  /* Side insets when the device is in landscape with a notch */
+  padding-left: max(env(safe-area-inset-left, 0px), 0px);
+  padding-right: max(env(safe-area-inset-right, 0px), 0px);
+}
+/* Generic safe-area helpers — opt-in via class */
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+}
+
+/* iOS PWA installed-mode background (matches theme so status bar blends
+ * cleanly with the app shell). */
+@media (display-mode: standalone) {
+  html {
+    background-color: #020617;
+  }
+}
+
+/* Replace 100vh with 100dvh in our min-height utility so iOS Safari's
+ * URL-bar collapse doesn't leave a gap or scroll-trap.
+ * Tailwind's `min-h-screen` compiles to min-height: 100vh; we override. */
+@supports (height: 100dvh) {
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+}
+
+/* Skip-to-main link — appears only when keyboard-focused. Critical
+ * a11y feature for screen-reader users + keyboard-only navigation. */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 8px;
+  z-index: 1000;
+  padding: 0.5rem 0.75rem;
+  background: #020617;
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 150ms ease-out;
+}
+.skip-link:focus {
+  top: max(env(safe-area-inset-top, 0px), 8px);
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+
+/* Visible focus ring everywhere, but only when navigating with keyboard.
+ * iOS Safari now supports :focus-visible. */
+:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible,
+a:focus-visible {
+  outline-offset: 3px;
+}
+
 /* <kbd> a11y — the default slate-500 on slate-800 was 4.39:1, just under
  * WCAG AA's 4.5:1 cutoff for small text. Force a slightly lighter text
  * color (#cbd5e1, slate-300, ~10:1) so every <kbd> on the site hits AAA. */
